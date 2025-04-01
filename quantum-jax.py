@@ -37,12 +37,12 @@ ny = 128
 nz = 32
 
 # box dimensions (in units of kpc)
-Lx = 16.0
-Ly = 8.0
-Lz = 2.0
+Lx = 128.0
+Ly = 64.0
+Lz = 16.0
 
 # average density (in units of Msun / kpc^3)
-rhobar = 300.0
+rho_bar = 300.0
 
 # stop time (in units of kpc / (km/s) = 0.9778 Gyr)
 t_end = 1.0
@@ -83,118 +83,105 @@ ky = jnp.fft.ifftshift(ky)
 kz = jnp.fft.ifftshift(kz)
 kSq = kx**2 + ky**2 + kz**2
 
+# Time step
+dt_kin = m_per_hbar/6.0*(dx*dy*dz)**(2.0/3.0)
+nt = int(jnp.ceil(t_end / dt_kin))
+dt = t_end / nt
+
 
 @jax.jit
 def get_potential(psi):
-
-    Vhat = -jnp.fft.fftn(4.0 * jnp.pi * G * (jnp.abs(psi) ** 2 - rhobar)) / (kSq + (kSq == 0) )
+    # solve poisson equation
+    Vhat = -jnp.fft.fftn(4.0 * jnp.pi * G * (jnp.abs(psi) ** 2 - rho_bar)) / (
+        kSq + (kSq == 0)
+    )
     V = jnp.real(jnp.fft.ifftn(Vhat))
 
     return V
 
 
 @jax.jit
-def update(psi, t, V, dt):
+def update(_, psi):
+
     # (1/2) kick
+    V = get_potential(psi)
     psi = jnp.exp(-1.0j * m_per_hbar * dt / 2.0 * V) * psi
-    
+
     # drift
     psihat = jnp.fft.fftn(psi)
     psihat = jnp.exp(dt * (-1.0j * kSq / m_per_hbar / 2.0)) * psihat
     psi = jnp.fft.ifftn(psihat)
-    
-    # update potential
-    V = get_potential(psi)
-    
+
     # (1/2) kick
+    V = get_potential(psi)
     psi = jnp.exp(-1.0j * m_per_hbar * dt / 2.0 * V) * psi
-    
-    # update time
-    t += dt
 
-    return psi, t, V
-
-
+    return psi
 
 
 def main():
     """Physics simulation"""
 
-    # Simulation parameters
-    dt = 0.01
-
     # Intial Condition
-    t = 0
     amp = 10.0
     sigma = 0.5
     rho = 300.0
     rho += (
         2.0
         * amp
-        * jnp.exp(-((X - 0.5*Lx) ** 2 + (Y - 0.25*Ly) ** 2) / 2.0 / sigma**2)
+        * jnp.exp(-((X - 0.5 * Lx) ** 2 + (Y - 0.25 * Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
     rho += (
         1.5
         * amp
-        * jnp.exp(-((X - 0.2*Lx) ** 2 + (Y - 0.3*Ly) ** 2) / 2.0 / sigma**2)
+        * jnp.exp(-((X - 0.2 * Lx) ** 2 + (Y - 0.3 * Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
     rho += (
         amp
-        * jnp.exp(-((X - 0.4*Lx) ** 2 + (Y - 0.6*Ly) ** 2) / 2.0 / sigma**2)
+        * jnp.exp(-((X - 0.4 * Lx) ** 2 + (Y - 0.6 * Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
     rho += (
         amp
-        * jnp.exp(-((X - 0.6*Lx) ** 2 + (Y - 0.24*Ly) ** 2) / 2.0 / sigma**2)
+        * jnp.exp(-((X - 0.6 * Lx) ** 2 + (Y - 0.24 * Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
     rho += (
         amp
-        * jnp.exp(-((X - 0.8*Lx) ** 2 + (Y - 0.8*Ly) ** 2) / 2.0 / sigma**2)
+        * jnp.exp(-((X - 0.8 * Lx) ** 2 + (Y - 0.8 * Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
     rho += (
         amp
-        * jnp.exp(-((X - 0.6*Lx) ** 2 + (Y - 0.27*Ly) ** 2) / 2.0 / sigma**2)
+        * jnp.exp(-((X - 0.6 * Lx) ** 2 + (Y - 0.27 * Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
     rho += (
         amp
-        * jnp.exp(-((X - 0.7*Lx) ** 2 + (Y - 0.74*Ly) ** 2) / 2.0 / sigma**2)
+        * jnp.exp(-((X - 0.7 * Lx) ** 2 + (Y - 0.74 * Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
     rho += (
         amp
-        * jnp.exp(-((X - 0.3*Lx) ** 2 + (Y - 0.3*Ly) ** 2) / 2.0 / sigma**2)
+        * jnp.exp(-((X - 0.3 * Lx) ** 2 + (Y - 0.3 * Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
-    # normalize wavefunction to <|psi|^2>=rhobar
-    rho *= rhobar / jnp.mean(rho)
-    psi = jnp.sqrt(rho)
-
-    # Potential
-    V = get_potential(psi)
-
-    # number of timesteps
-    nt = int(jnp.ceil(t_end / dt))
+    # normalize wavefunction to <|psi|^2>=rho_bar
+    rho *= rho_bar / jnp.mean(rho)
+    psi = jnp.sqrt(rho) + 0.0j
 
     # Simulation Main Loop
     t0 = time.time()
-    for i in range(nt):
-        
-        psi, t, V = update(psi, t, V, dt)
-
-
-
+    psi = jax.lax.fori_loop(0, nt, update, init_val=psi)
     print("Simulation Run Time (s): ", time.time() - t0)
 
     # Plot final state
     fig = plt.figure(figsize=(6, 4), dpi=80)
     ax = fig.add_subplot(111)
     plt.imshow(jnp.mean(jnp.log10(jnp.abs(psi) ** 2), axis=2), cmap="inferno")
-    #plt.clim(2.46, 2.49)
+    # plt.clim(2.46, 2.49)
     plt.colorbar(label="log10(|psi|^2)")
     ax.set_aspect("equal")
     ax.invert_yaxis()
