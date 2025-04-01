@@ -1,5 +1,6 @@
 import jax
 import jax.numpy as jnp
+import numpy as np
 import matplotlib.pyplot as plt
 import time
 
@@ -50,6 +51,10 @@ t_end = 1.0
 # axion mass (in units of 10^-22 eV)
 m22 = 1.0
 
+# stars
+M_s = 0.1 * rho_bar * Lx * Ly * Lz  # total mass of stars, in units of Msun
+n_s = 10000  # number of star particles
+
 
 ##################
 # Global Constants
@@ -59,6 +64,7 @@ hbar = 1.71818134e-87  # in [V][L][M] | (hbar / ((km/s) * kpc * mass of sun))
 ev_to_msun = 8.96215334e-67  # mass of electron volt in [M] | (eV/c^2/mass of sun)
 m = m22 * 1.0e-22 * ev_to_msun  # axion mass in [M]
 m_per_hbar = m / hbar  # (~0.052 1/([V][M]))
+m_s = M_s / n_s  # mass of each star particle
 
 
 ######
@@ -101,7 +107,9 @@ def get_potential(psi):
 
 
 @jax.jit
-def update(_, psi):
+def update(_, val):
+
+    psi, pos, vel = val
 
     # (1/2) kick
     V = get_potential(psi)
@@ -116,7 +124,7 @@ def update(_, psi):
     V = get_potential(psi)
     psi = jnp.exp(-1.0j * m_per_hbar * dt / 2.0 * V) * psi
 
-    return psi
+    return psi, pos, vel
 
 
 def main():
@@ -172,9 +180,14 @@ def main():
     rho *= rho_bar / jnp.mean(rho)
     psi = jnp.sqrt(rho) + 0.0j
 
+    # stars have random positions and velocities
+    np.random.seed(17)
+    pos = np.random.uniform(0.0, 1.0, (n_s, 3))
+    vel = np.random.uniform(0.0, 1.0, (n_s, 3))
+
     # Simulation Main Loop
     t0 = time.time()
-    psi = jax.lax.fori_loop(0, nt, update, init_val=psi)
+    (psi,pos,vel) = jax.lax.fori_loop(0, nt, update, init_val=(psi,pos,vel))
     print("Simulation Run Time (s): ", time.time() - t0)
 
     # Plot final state
