@@ -3,7 +3,8 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
 """
-A differentiable Schrodinger-Poisson solver written in JAX
+A minimal differentiable Schrodinger-Poisson solver written in JAX
+to simulate fuzzy dark matter.
 
 Philip Mocz (2025), @pmocz
 Flatiron Institute
@@ -15,95 +16,139 @@ Galaxy Formation with BECDM: I. Turbulence and relaxation of idealised haloes
 Monthly Notices of the Royal Astronomical Society, 471(4), 4559-4570
 https://doi.org/10.1093/mnras/stx1887
 https://arxiv.org/abs/1705.05845
+
 """
+
+#############
+# Unit System
+# [L] = kpc
+# [V] = km/s
+# [M] = Msun
+# ==> [T] = kpc / (km/s) = 0.9778 Gyr
+
+
+######################################
+# Global Simulation Parameters (input)
+
+# resolution
+nx = 256
+ny = 128
+nz = 32
+
+# box dimensions (in units of kpc)
+Lx = 16.0
+Ly = 8.0
+Lz = 2.0
+
+# average density (in units of Msun / kpc^3)
+rhobar = 300.0
+
+# stop time (in units of kpc / (km/s) = 0.9778 Gyr)
+t_end = 1.0
+
+# axion mass (in units of 10^-22 eV)
+m22 = 1.0
+
+
+##################
+# Global Constants
+
+G = 4.30241002e-6  # gravitational constant in kpc (km/s)^2 / Msun  |  [V^2][L]/[M]  |  (G / (km/s)^2 * (mass of sun) / kpc)
+hbar = 1.71818134e-87  # in [V][L][M] | (hbar / ((km/s) * kpc * mass of sun))
+ev_to_msun = 8.96215334e-67  # mass of electron volt in [M] | (eV/c^2/mass of sun)
+m = m22 * 1.0e-22 * ev_to_msun  # axion mass in [M]
+m_per_hbar = m / hbar  # (~0.052 1/([V][M]))
+
+
+######
+# Mesh
+
+# Domain [0,Lx] x [0,Ly] x [0,Lz]
+dx = Lx / nx
+dy = Ly / ny
+dz = Lz / nz
+xlin = jnp.linspace(0.5 * dx, Lx - 0.5 * dx, nx)
+ylin = jnp.linspace(0.5 * dy, Ly - 0.5 * dy, ny)
+zlin = jnp.linspace(0.5 * dz, Lz - 0.5 * dz, nz)
+X, Y, Z = jnp.meshgrid(xlin, ylin, zlin, indexing="ij")
+
+# Fourier Space Variables
+klinx = 2.0 * jnp.pi / Lx * jnp.arange(-nx / 2, nx / 2)
+kliny = 2.0 * jnp.pi / Ly * jnp.arange(-ny / 2, ny / 2)
+klinz = 2.0 * jnp.pi / Lz * jnp.arange(-nz / 2, nz / 2)
+kx, ky, kz = jnp.meshgrid(klinx, kliny, klinz, indexing="ij")
+kx = jnp.fft.ifftshift(kx)
+ky = jnp.fft.ifftshift(ky)
+kz = jnp.fft.ifftshift(kz)
+kSq = kx**2 + ky**2 + kz**2
+
+
+@jax.jit
+def update(psi, dt, V):
+    # XXX
+    pass
+
+
 
 
 def main():
-    """Quantum simulation"""
+    """Physics simulation"""
 
     # Simulation parameters
-    nx = 256
-    ny = 128
-    nz = 32
-    Lx = 1.0
-    Ly = 0.5
-    Lz = 0.125
-    t_end = 0.03
-    dt = 0.0001
-    t_out = 0.0001
-    G = 4000.0
+    dt = 0.001
+    t_out = 0.01
     plot_real_time = True
-
-    # Domain [0,Lx] x [0,Ly] x [0,Lz]
-    dx = Lx / nx
-    dy = Ly / ny
-    dz = Lz / nz
-    xlin = jnp.linspace(0.5 * dx, Lx - 0.5 * dx, nx)
-    ylin = jnp.linspace(0.5 * dy, Ly - 0.5 * dy, ny)
-    zlin = jnp.linspace(0.5 * dz, Lz - 0.5 * dz, nz)
-    X, Y, Z = jnp.meshgrid(xlin, ylin, zlin, indexing="ij")
 
     # Intial Condition
     t = 0
-    amp = 0.01
-    sigma = 0.03
-    rho = 0.9
+    amp = 10.0
+    sigma = 0.5
+    rho = 300.0
     rho += (
         2.0
         * amp
-        * jnp.exp(-((X - 0.5) ** 2 + (Y - 0.25) ** 2) / 2.0 / sigma**2)
+        * jnp.exp(-((X - 0.5*Lx) ** 2 + (Y - 0.25*Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
     rho += (
         1.5
         * amp
-        * jnp.exp(-((X - 0.2) ** 2 + (Y - 0.3) ** 2) / 2.0 / sigma**2)
+        * jnp.exp(-((X - 0.2*Lx) ** 2 + (Y - 0.3*Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
     rho += (
         amp
-        * jnp.exp(-((X - 0.4) ** 2 + (Y - 0.2) ** 2) / 2.0 / sigma**2)
+        * jnp.exp(-((X - 0.4*Lx) ** 2 + (Y - 0.6*Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
     rho += (
         amp
-        * jnp.exp(-((X - 0.6) ** 2 + (Y - 0.24) ** 2) / 2.0 / sigma**2)
+        * jnp.exp(-((X - 0.6*Lx) ** 2 + (Y - 0.24*Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
     rho += (
         amp
-        * jnp.exp(-((X - 0.8) ** 2 + (Y - 0.2) ** 2) / 2.0 / sigma**2)
+        * jnp.exp(-((X - 0.8*Lx) ** 2 + (Y - 0.8*Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
     rho += (
         amp
-        * jnp.exp(-((X - 0.6) ** 2 + (Y - 0.27) ** 2) / 2.0 / sigma**2)
+        * jnp.exp(-((X - 0.6*Lx) ** 2 + (Y - 0.27*Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
     rho += (
         amp
-        * jnp.exp(-((X - 0.7) ** 2 + (Y - 0.24) ** 2) / 2.0 / sigma**2)
+        * jnp.exp(-((X - 0.7*Lx) ** 2 + (Y - 0.74*Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
     rho += (
         amp
-        * jnp.exp(-((X - 0.3) ** 2 + (Y - 0.3) ** 2) / 2.0 / sigma**2)
+        * jnp.exp(-((X - 0.3*Lx) ** 2 + (Y - 0.3*Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
-    # normalize wavefunction to <|psi|^2>=1
-    rhobar = jnp.mean(rho)
-    rho /= rhobar
+    # normalize wavefunction to <|psi|^2>=rhobar
+    rho *= rhobar / jnp.mean(rho)
     psi = jnp.sqrt(rho)
-
-    # Fourier Space Variables
-    klinx = 2.0 * jnp.pi / Lx * jnp.arange(-nx / 2, nx / 2)
-    kliny = 2.0 * jnp.pi / Ly * jnp.arange(-ny / 2, ny / 2)
-    klinz = 2.0 * jnp.pi / Lz * jnp.arange(-nz / 2, nz / 2)
-    kx, ky, kz = jnp.meshgrid(klinx, kliny, klinz, indexing="ij")
-    kx = jnp.fft.ifftshift(kx)
-    ky = jnp.fft.ifftshift(ky)
-    kz = jnp.fft.ifftshift(kz)
-    kSq = kx**2 + ky**2 + kz**2
 
     # Potential
     Vhat = -jnp.fft.fftn(4.0 * jnp.pi * G * (jnp.abs(psi) ** 2 - 1.0)) / (
@@ -124,21 +169,21 @@ def main():
     # Simulation Main Loop
     for i in range(nt):
         # (1/2) kick
-        psi = jnp.exp(-1.0j * dt / 2.0 * V) * psi
+        psi = jnp.exp(-1.0j * m_per_hbar * dt / 2.0 * V) * psi
 
         # drift
         psihat = jnp.fft.fftn(psi)
-        psihat = jnp.exp(dt * (-1.0j * kSq / 2.0)) * psihat
+        psihat = jnp.exp(dt * (-1.0j * kSq / m_per_hbar / 2.0)) * psihat
         psi = jnp.fft.ifftn(psihat)
 
         # update potential
-        Vhat = -jnp.fft.fftn(4.0 * jnp.pi * G * (jnp.abs(psi) ** 2 - 1.0)) / (
+        Vhat = -jnp.fft.fftn(4.0 * jnp.pi * G * (jnp.abs(psi) ** 2 - rhobar)) / (
             kSq + (kSq == 0)
         )
         V = jnp.real(jnp.fft.ifftn(Vhat))
 
         # (1/2) kick
-        psi = jnp.exp(-1.0j * dt / 2.0 * V) * psi
+        psi = jnp.exp(-1.0j * m_per_hbar * dt / 2.0 * V) * psi
 
         # update time
         t += dt
@@ -152,7 +197,7 @@ def main():
             plt.cla()
 
             plt.imshow(jnp.mean(jnp.log10(jnp.abs(psi) ** 2), axis=2), cmap="inferno")
-            plt.clim(-1, 2)
+            #plt.clim(0, 3)
             ax1.get_xaxis().set_visible(False)
             ax1.get_yaxis().set_visible(False)
             ax1.invert_yaxis()
@@ -175,7 +220,7 @@ def main():
     plt.title(r"$\log_{10}(|\psi|^2)$")
     plt.sca(ax2)
     plt.title(r"${\rm angle}(\psi)$")
-    plt.savefig("quantum.png", dpi=240)
+    plt.savefig("output/quantum.png", dpi=240)
     plt.show()
 
 
