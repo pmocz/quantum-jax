@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
+import time
 
 """
 A minimal differentiable Schrodinger-Poisson solver written in JAX
@@ -84,9 +85,34 @@ kSq = kx**2 + ky**2 + kz**2
 
 
 @jax.jit
-def update(psi, dt, V):
-    # XXX
-    pass
+def get_potential(psi):
+
+    Vhat = -jnp.fft.fftn(4.0 * jnp.pi * G * (jnp.abs(psi) ** 2 - rhobar)) / (kSq + (kSq == 0) )
+    V = jnp.real(jnp.fft.ifftn(Vhat))
+
+    return V
+
+
+@jax.jit
+def update(psi, t, V, dt):
+    # (1/2) kick
+    psi = jnp.exp(-1.0j * m_per_hbar * dt / 2.0 * V) * psi
+    
+    # drift
+    psihat = jnp.fft.fftn(psi)
+    psihat = jnp.exp(dt * (-1.0j * kSq / m_per_hbar / 2.0)) * psihat
+    psi = jnp.fft.ifftn(psihat)
+    
+    # update potential
+    V = get_potential(psi)
+    
+    # (1/2) kick
+    psi = jnp.exp(-1.0j * m_per_hbar * dt / 2.0 * V) * psi
+    
+    # update time
+    t += dt
+
+    return psi, t, V
 
 
 
@@ -95,9 +121,7 @@ def main():
     """Physics simulation"""
 
     # Simulation parameters
-    dt = 0.001
-    t_out = 0.01
-    plot_real_time = True
+    dt = 0.01
 
     # Intial Condition
     t = 0
@@ -151,75 +175,32 @@ def main():
     psi = jnp.sqrt(rho)
 
     # Potential
-    Vhat = -jnp.fft.fftn(4.0 * jnp.pi * G * (jnp.abs(psi) ** 2 - 1.0)) / (
-        kSq + (kSq == 0)
-    )
-    V = jnp.real(jnp.fft.ifftn(Vhat))
+    V = get_potential(psi)
 
     # number of timesteps
     nt = int(jnp.ceil(t_end / dt))
 
-    # prep figure
-    fig = plt.figure(figsize=(6, 4), dpi=80)
-    grid = plt.GridSpec(1, 2, wspace=0.0, hspace=0.0)
-    ax1 = plt.subplot(grid[0, 0])
-    ax2 = plt.subplot(grid[0, 1])
-    output_count = 1
-
     # Simulation Main Loop
+    t0 = time.time()
     for i in range(nt):
-        # (1/2) kick
-        psi = jnp.exp(-1.0j * m_per_hbar * dt / 2.0 * V) * psi
+        
+        psi, t, V = update(psi, t, V, dt)
 
-        # drift
-        psihat = jnp.fft.fftn(psi)
-        psihat = jnp.exp(dt * (-1.0j * kSq / m_per_hbar / 2.0)) * psihat
-        psi = jnp.fft.ifftn(psihat)
 
-        # update potential
-        Vhat = -jnp.fft.fftn(4.0 * jnp.pi * G * (jnp.abs(psi) ** 2 - rhobar)) / (
-            kSq + (kSq == 0)
-        )
-        V = jnp.real(jnp.fft.ifftn(Vhat))
 
-        # (1/2) kick
-        psi = jnp.exp(-1.0j * m_per_hbar * dt / 2.0 * V) * psi
+    print("Simulation Run Time (s): ", time.time() - t0)
 
-        # update time
-        t += dt
-
-        # plot in real time
-        plot_this_turn = False
-        if t + dt > output_count * t_out:
-            plot_this_turn = True
-        if (plot_real_time and plot_this_turn) or (i == nt - 1):
-            plt.sca(ax1)
-            plt.cla()
-
-            plt.imshow(jnp.mean(jnp.log10(jnp.abs(psi) ** 2), axis=2), cmap="inferno")
-            #plt.clim(0, 3)
-            ax1.get_xaxis().set_visible(False)
-            ax1.get_yaxis().set_visible(False)
-            ax1.invert_yaxis()
-            ax1.set_aspect("equal")
-
-            plt.sca(ax2)
-            plt.cla()
-            plt.imshow(jnp.mean(jnp.angle(psi), axis=2), cmap="bwr")
-            plt.clim(-jnp.pi, jnp.pi)
-            ax2.get_xaxis().set_visible(False)
-            ax2.get_yaxis().set_visible(False)
-            ax2.invert_yaxis()
-            ax2.set_aspect("equal")
-
-            plt.pause(0.001)
-            output_count += 1
-
-    # Save figure
-    plt.sca(ax1)
-    plt.title(r"$\log_{10}(|\psi|^2)$")
-    plt.sca(ax2)
-    plt.title(r"${\rm angle}(\psi)$")
+    # Plot final state
+    fig = plt.figure(figsize=(6, 4), dpi=80)
+    ax = fig.add_subplot(111)
+    plt.imshow(jnp.mean(jnp.log10(jnp.abs(psi) ** 2), axis=2), cmap="inferno")
+    #plt.clim(2.46, 2.49)
+    plt.colorbar(label="log10(|psi|^2)")
+    ax.set_aspect("equal")
+    ax.invert_yaxis()
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+    plt.tight_layout()
     plt.savefig("output/quantum.png", dpi=240)
     plt.show()
 
