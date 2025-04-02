@@ -19,6 +19,8 @@ Monthly Notices of the Royal Astronomical Society, 471(4), 4559-4570
 https://doi.org/10.1093/mnras/stx1887
 https://arxiv.org/abs/1705.05845
 
+plus star particles (coupled gravitationally).
+
 """
 
 #############
@@ -53,7 +55,7 @@ m22 = 1.0
 
 # stars
 M_s = 0.1 * rho_bar * Lx * Ly * Lz  # total mass of stars, in units of Msun
-n_s = 10000  # number of star particles
+n_s = 400  # number of star particles
 
 
 ##################
@@ -96,9 +98,9 @@ dt = t_end / nt
 
 
 @jax.jit
-def get_potential(psi):
-    # solve poisson equation
-    Vhat = -jnp.fft.fftn(4.0 * jnp.pi * G * (jnp.abs(psi) ** 2 - rho_bar)) / (
+def get_potential(rho):
+    # solve the Poisson equation
+    Vhat = -jnp.fft.fftn(4.0 * jnp.pi * G * (rho - rho_bar)) / (
         kSq + (kSq == 0)
     )
     V = jnp.real(jnp.fft.ifftn(Vhat))
@@ -107,22 +109,66 @@ def get_potential(psi):
 
 
 @jax.jit
-def update(_, val):
+def bin_stars(pos):
+    # bin the stars into the grid
+    rho = jnp.zeros((nx, ny, nz))
+    return rho
+    pos = jnp.clip(pos, 0.0, 1.0)
+    pos = jnp.floor(pos * jnp.array([nx, ny, nz])).astype(int)
+    for i in range(n_s):
+        rho = rho.at[pos[i, 0], pos[i, 1], pos[i, 2]].add(m_s)
+    # XXX
+    return rho
 
-    psi, pos, vel = val
+@jax.jit
+def get_acceleration(pos, rho):
+    return jnp.zeros_like(pos)
+    # compute the acceleration of the stars
+    rho = jnp.reshape(rho, (nx, ny, nz))
+    V = get_potential(rho)
+    Vhat = jnp.fft.fftn(V)
+    ax = -jnp.real(jnp.fft.ifftn(-1.0j * kx * Vhat))
+    ay = -jnp.real(jnp.fft.ifftn(-1.0j * ky * Vhat))
+    az = -jnp.real(jnp.fft.ifftn(-1.0j * kz * Vhat))
+
+    acc = jnp.zeros_like(pos)
+    acc[:, 0] = ax[pos[:, 0].astype(int), pos[:, 1].astype(int), pos[:, 2].astype(int)]
+    acc[:, 1] = ay[pos[:, 0].astype(int), pos[:, 1].astype(int), pos[:, 2].astype(int)]
+    acc[:, 2] = az[pos[:, 0].astype(int), pos[:, 1].astype(int), pos[:, 2].astype(int)]
+    # XXX
+    return acc
+
+
+@jax.jit
+def update(_, state):
+
+    psi, pos, vel = state
 
     # (1/2) kick
-    V = get_potential(psi)
+    rho_s = bin_stars(pos)
+    rho = jnp.abs(psi) ** 2 + rho_s
+    V = get_potential(rho)
     psi = jnp.exp(-1.0j * m_per_hbar * dt / 2.0 * V) * psi
+
+    acc = get_acceleration(pos, rho)
+    vel = vel + acc * dt / 2.0
 
     # drift
     psihat = jnp.fft.fftn(psi)
     psihat = jnp.exp(dt * (-1.0j * kSq / m_per_hbar / 2.0)) * psihat
     psi = jnp.fft.ifftn(psihat)
 
+    pos = pos + vel * dt
+    pos = jnp.mod(pos, jnp.array([Lx, Ly, Lz]))
+
     # (1/2) kick
-    V = get_potential(psi)
+    rho_s = bin_stars(pos)
+    rho = jnp.abs(psi) ** 2 + rho_s
+    V = get_potential(rho)
     psi = jnp.exp(-1.0j * m_per_hbar * dt / 2.0 * V) * psi
+
+    acc = get_acceleration(pos, rho)
+#vel = vel + acc * dt / 2.0
 
     return psi, pos, vel
 
@@ -183,7 +229,8 @@ def main():
     # stars have random positions and velocities
     np.random.seed(17)
     pos = np.random.uniform(0.0, 1.0, (n_s, 3))
-    vel = np.random.uniform(0.0, 1.0, (n_s, 3))
+    pos = pos * np.array([Lx, Ly, Lz])
+    vel = np.random.uniform(-1.0, 1.0, (n_s, 3))
 
     # Simulation Main Loop
     t0 = time.time()
@@ -193,11 +240,14 @@ def main():
     # Plot final state
     fig = plt.figure(figsize=(6, 4), dpi=80)
     ax = fig.add_subplot(111)
-    plt.imshow(jnp.mean(jnp.log10(jnp.abs(psi) ** 2), axis=2), cmap="inferno")
+    rho_proj = jnp.mean(jnp.log10(jnp.abs(psi) ** 2), axis=2).T
+    plt.imshow(rho_proj, cmap="inferno", origin="lower", extent=(0, nx, 0, ny))
     # plt.clim(2.46, 2.49)
+    sx = jax.lax.slice(pos,(0,0),(n_s,1)) / Lx * nx
+    sy = jax.lax.slice(pos,(0,1),(n_s,2)) / Ly * ny
+    plt.plot(sx, sy, color='cyan', marker='.', linestyle='None', markersize=1)
     plt.colorbar(label="log10(|psi|^2)")
     ax.set_aspect("equal")
-    ax.invert_yaxis()
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
     plt.tight_layout()
