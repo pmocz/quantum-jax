@@ -153,7 +153,6 @@ def bin_stars(pos):
     return rho
 
 
-
 def get_acceleration(pos, rho):
     # compute the acceleration of the stars
     dxs = jnp.array([dx, dy, dz])
@@ -172,20 +171,34 @@ def get_acceleration(pos, rho):
     az = -jnp.real(jnp.fft.ifftn(-1.0j * kz * V_hat))
     a_grid = jnp.stack((ax, ay, az), axis=-1)
 
-
     # interpolate the accelerations to the star positions
     acc = jnp.zeros((n_s, 3))
-    acc += (weight_i[:, 0] * weight_i[:, 1] * weight_i[:, 2])[:, None] * a_grid[i[:, 0], i[:, 1], i[:, 2]]
-    acc += (weight_ip1[:, 0] * weight_i[:, 1] * weight_i[:, 2])[:, None] * a_grid[ip1[:, 0], i[:, 1], i[:, 2]]
-    acc += (weight_i[:, 0] * weight_ip1[:, 1] * weight_i[:, 2])[:, None] * a_grid[i[:, 0], ip1[:, 1], i[:, 2]]
-    acc += (weight_i[:, 0] * weight_i[:, 1] * weight_ip1[:, 2])[:, None] * a_grid[i[:, 0], i[:, 1], ip1[:, 2]]
-    acc += (weight_ip1[:, 0] * weight_ip1[:, 1] * weight_i[:, 2])[:, None] * a_grid[ip1[:, 0], ip1[:, 1], i[:, 2]]
-    acc += (weight_ip1[:, 0] * weight_i[:, 1] * weight_ip1[:, 2])[:, None] * a_grid[ip1[:, 0], i[:, 1], ip1[:, 2]]
-    acc += (weight_i[:, 0] * weight_ip1[:, 1] * weight_ip1[:, 2])[:, None] * a_grid[i[:, 0], ip1[:, 1], ip1[:, 2]]
-    acc += (weight_ip1[:, 0] * weight_ip1[:, 1] * weight_ip1[:, 2])[:, None] * a_grid[ip1[:, 0], ip1[:, 1], ip1[:, 2]]
+    acc += (weight_i[:, 0] * weight_i[:, 1] * weight_i[:, 2])[:, None] * a_grid[
+        i[:, 0], i[:, 1], i[:, 2]
+    ]
+    acc += (weight_ip1[:, 0] * weight_i[:, 1] * weight_i[:, 2])[:, None] * a_grid[
+        ip1[:, 0], i[:, 1], i[:, 2]
+    ]
+    acc += (weight_i[:, 0] * weight_ip1[:, 1] * weight_i[:, 2])[:, None] * a_grid[
+        i[:, 0], ip1[:, 1], i[:, 2]
+    ]
+    acc += (weight_i[:, 0] * weight_i[:, 1] * weight_ip1[:, 2])[:, None] * a_grid[
+        i[:, 0], i[:, 1], ip1[:, 2]
+    ]
+    acc += (weight_ip1[:, 0] * weight_ip1[:, 1] * weight_i[:, 2])[:, None] * a_grid[
+        ip1[:, 0], ip1[:, 1], i[:, 2]
+    ]
+    acc += (weight_ip1[:, 0] * weight_i[:, 1] * weight_ip1[:, 2])[:, None] * a_grid[
+        ip1[:, 0], i[:, 1], ip1[:, 2]
+    ]
+    acc += (weight_i[:, 0] * weight_ip1[:, 1] * weight_ip1[:, 2])[:, None] * a_grid[
+        i[:, 0], ip1[:, 1], ip1[:, 2]
+    ]
+    acc += (weight_ip1[:, 0] * weight_ip1[:, 1] * weight_ip1[:, 2])[:, None] * a_grid[
+        ip1[:, 0], ip1[:, 1], ip1[:, 2]
+    ]
 
     return acc
-
 
 
 @jax.jit
