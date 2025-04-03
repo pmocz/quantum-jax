@@ -54,7 +54,7 @@ rho_bar = 300.0
 t_end = 1.0
 
 # axion mass (in units of 10^-22 eV)
-m22 = 1.0
+m_22 = 1.0
 
 # stars
 M_s = 0.1 * rho_bar * Lx * Ly * Lz  # total mass of stars, in units of Msun
@@ -67,7 +67,7 @@ n_s = 400  # number of star particles
 G = 4.30241002e-6  # gravitational constant in kpc (km/s)^2 / Msun  |  [V^2][L]/[M]  |  (G / (km/s)^2 * (mass of sun) / kpc)
 hbar = 1.71818134e-87  # in [V][L][M] | (hbar / ((km/s) * kpc * mass of sun))
 ev_to_msun = 8.96215334e-67  # mass of electron volt in [M] | (eV/c^2/mass of sun)
-m = m22 * 1.0e-22 * ev_to_msun  # axion mass in [M]
+m = m_22 * 1.0e-22 * ev_to_msun  # axion mass in [M]
 m_per_hbar = m / hbar  # (~0.052 1/([V][M]))
 m_s = M_s / n_s  # mass of each star particle
 
@@ -79,20 +79,20 @@ m_s = M_s / n_s  # mass of each star particle
 dx = Lx / nx
 dy = Ly / ny
 dz = Lz / nz
-xlin = jnp.linspace(0.5 * dx, Lx - 0.5 * dx, nx)
-ylin = jnp.linspace(0.5 * dy, Ly - 0.5 * dy, ny)
-zlin = jnp.linspace(0.5 * dz, Lz - 0.5 * dz, nz)
-X, Y, Z = jnp.meshgrid(xlin, ylin, zlin, indexing="ij")
+x_lin = jnp.linspace(0.5 * dx, Lx - 0.5 * dx, nx)
+y_lin = jnp.linspace(0.5 * dy, Ly - 0.5 * dy, ny)
+z_lin = jnp.linspace(0.5 * dz, Lz - 0.5 * dz, nz)
+X, Y, Z = jnp.meshgrid(x_lin, y_lin, z_lin, indexing="ij")
 
 # Fourier Space Variables
-klinx = 2.0 * jnp.pi / Lx * jnp.arange(-nx / 2, nx / 2)
-kliny = 2.0 * jnp.pi / Ly * jnp.arange(-ny / 2, ny / 2)
-klinz = 2.0 * jnp.pi / Lz * jnp.arange(-nz / 2, nz / 2)
-kx, ky, kz = jnp.meshgrid(klinx, kliny, klinz, indexing="ij")
+kx_lin = 2.0 * jnp.pi / Lx * jnp.arange(-nx / 2, nx / 2)
+ky_lin = 2.0 * jnp.pi / Ly * jnp.arange(-ny / 2, ny / 2)
+kz_lin = 2.0 * jnp.pi / Lz * jnp.arange(-nz / 2, nz / 2)
+kx, ky, kz = jnp.meshgrid(kx_lin, ky_lin, kz_lin, indexing="ij")
 kx = jnp.fft.ifftshift(kx)
 ky = jnp.fft.ifftshift(ky)
 kz = jnp.fft.ifftshift(kz)
-kSq = kx**2 + ky**2 + kz**2
+k_sq = kx**2 + ky**2 + kz**2
 
 # Time step
 dt_kin = m_per_hbar / 6.0 * (dx * dy * dz) ** (2.0 / 3.0)
@@ -102,8 +102,8 @@ dt = t_end / nt
 
 def get_potential(rho):
     # solve the Poisson equation
-    Vhat = -jnp.fft.fftn(4.0 * jnp.pi * G * (rho - rho_bar)) / (kSq + (kSq == 0))
-    V = jnp.real(jnp.fft.ifftn(Vhat))
+    V_hat = -jnp.fft.fftn(4.0 * jnp.pi * G * (rho - rho_bar)) / (k_sq + (k_sq == 0))
+    V = jnp.real(jnp.fft.ifftn(V_hat))
 
     return V
 
@@ -111,44 +111,40 @@ def get_potential(rho):
 def bin_stars(pos):
     # bin the stars into the grid using cloud-in-cell weights
     rho = jnp.zeros((nx, ny, nz))
-    i = jnp.floor(
-        (pos - jnp.array([dx / 2.0, dy / 2.0, dz / 2.0])) / jnp.array([dx, dy, dz])
-    ).astype(int)
-    i = jnp.mod(i, jnp.array([nx, ny, nz]))
-    ip1 = i + 1
-    weight_i = ((ip1 + 0.5) * jnp.array([dx, dy, dz]) - pos) / jnp.array([dx, dy, dz])
-    weight_ip1 = (pos - (i + 0.5) * jnp.array([dx, dy, dz])) / jnp.array([dx, dy, dz])
-    ip1 = jnp.mod(ip1, jnp.array([nx, ny, nz]))
+    dxs = jnp.array([dx, dy, dz])
+    i = jnp.floor((pos - 0.5*dxs) / dxs )
+    ip1 = i + 1.0
+    weight_i = ((ip1 + 0.5) * dxs - pos) / dxs
+    weight_ip1 = (pos - (i + 0.5) * dxs) / dxs
+    i = jnp.mod(i, jnp.array([nx, ny, nz])).astype(int)
+    ip1 = jnp.mod(ip1, jnp.array([nx, ny, nz])).astype(int)
 
     def deposit_star(s, rho):
         # deposit the star mass into the grid
+        fac = m_s / (dx * dy * dz)
         rho = rho.at[i[s, 0], i[s, 1], i[s, 2]].add(
-            weight_i[s, 0] * weight_i[s, 1] * weight_i[s, 2] * m_s / (dx * dy * dz)
+            weight_i[s, 0] * weight_i[s, 1] * weight_i[s, 2] * fac
         )
         rho = rho.at[ip1[s, 0], i[s, 1], i[s, 2]].add(
-            weight_ip1[s, 0] * weight_i[s, 1] * weight_i[s, 2] * m_s / (dx * dy * dz)
+            weight_ip1[s, 0] * weight_i[s, 1] * weight_i[s, 2] * fac
         )
         rho = rho.at[i[s, 0], ip1[s, 1], i[s, 2]].add(
-            weight_i[s, 0] * weight_ip1[s, 1] * weight_i[s, 2] * m_s / (dx * dy * dz)
+            weight_i[s, 0] * weight_ip1[s, 1] * weight_i[s, 2] * fac
         )
         rho = rho.at[i[s, 0], i[s, 1], ip1[s, 2]].add(
-            weight_i[s, 0] * weight_i[s, 1] * weight_ip1[s, 2] * m_s / (dx * dy * dz)
+            weight_i[s, 0] * weight_i[s, 1] * weight_ip1[s, 2] * fac
         )
         rho = rho.at[ip1[s, 0], ip1[s, 1], i[s, 2]].add(
-            weight_ip1[s, 0] * weight_ip1[s, 1] * weight_i[s, 2] * m_s / (dx * dy * dz)
+            weight_ip1[s, 0] * weight_ip1[s, 1] * weight_i[s, 2] * fac
         )
         rho = rho.at[ip1[s, 0], i[s, 1], ip1[s, 2]].add(
-            weight_ip1[s, 0] * weight_i[s, 1] * weight_ip1[s, 2] * m_s / (dx * dy * dz)
+            weight_ip1[s, 0] * weight_i[s, 1] * weight_ip1[s, 2] * fac
         )
         rho = rho.at[i[s, 0], ip1[s, 1], ip1[s, 2]].add(
-            weight_i[s, 0] * weight_ip1[s, 1] * weight_ip1[s, 2] * m_s / (dx * dy * dz)
+            weight_i[s, 0] * weight_ip1[s, 1] * weight_ip1[s, 2] * fac
         )
-        rho = rho.at[ip1[s, 0], ip1[s, 1], ip1[s, 2]].add(
-            weight_ip1[s, 0]
-            * weight_ip1[s, 1]
-            * weight_ip1[s, 2]
-            * m_s
-            / (dx * dy * dz)
+        rho = rho.at[ip1[s, 0], ip1[s, 1], ip1[s, 2]].add( 
+            weight_ip1[s, 0] * weight_ip1[s, 1] * weight_ip1[s, 2] * fac
         )
         return rho
 
@@ -162,10 +158,10 @@ def get_acceleration(pos, rho):
     # compute the acceleration of the stars
     rho = jnp.reshape(rho, (nx, ny, nz))
     V = get_potential(rho)
-    Vhat = jnp.fft.fftn(V)
-    ax = -jnp.real(jnp.fft.ifftn(-1.0j * kx * Vhat))
-    ay = -jnp.real(jnp.fft.ifftn(-1.0j * ky * Vhat))
-    az = -jnp.real(jnp.fft.ifftn(-1.0j * kz * Vhat))
+    V_hat = jnp.fft.fftn(V)
+    ax = -jnp.real(jnp.fft.ifftn(-1.0j * kx * V_hat))
+    ay = -jnp.real(jnp.fft.ifftn(-1.0j * ky * V_hat))
+    az = -jnp.real(jnp.fft.ifftn(-1.0j * kz * V_hat))
 
     acc = jnp.zeros_like(pos)
     acc[:, 0] = ax[pos[:, 0].astype(int), pos[:, 1].astype(int), pos[:, 2].astype(int)]
@@ -189,9 +185,9 @@ def update(_, state):
     vel = vel + acc * dt / 2.0
 
     # drift
-    psihat = jnp.fft.fftn(psi)
-    psihat = jnp.exp(dt * (-1.0j * kSq / m_per_hbar / 2.0)) * psihat
-    psi = jnp.fft.ifftn(psihat)
+    psi_hat = jnp.fft.fftn(psi)
+    psi_hat = jnp.exp(dt * (-1.0j * k_sq / m_per_hbar / 2.0)) * psi_hat
+    psi = jnp.fft.ifftn(psi_hat)
 
     pos = pos + vel * dt
     pos = jnp.mod(pos, jnp.array([Lx, Ly, Lz]))
@@ -267,18 +263,6 @@ def main():
     pos = pos * np.array([Lx, Ly, Lz])
     vel = np.random.uniform(-1.0, 1.0, (n_s, 3))
 
-    # plot  rho_s XXX
-    rho_s = bin_stars(pos)
-    fig = plt.figure(figsize=(6, 4), dpi=80)
-    ax = fig.add_subplot(111)
-    rho_proj = jnp.mean(rho_s, axis=2).T
-    plt.imshow(rho_proj, cmap="inferno", origin="lower", extent=(0, nx, 0, ny))
-    sx = jax.lax.slice(pos, (0, 0), (n_s, 1)) / Lx * nx
-    sy = jax.lax.slice(pos, (0, 1), (n_s, 2)) / Ly * ny
-    plt.plot(sx, sy, color="cyan", marker=".", linestyle="None", markersize=1)
-    plt.show()
-    # XXX
-
     # Simulation Main Loop
     t0 = time.time()
     (psi, pos, vel) = jax.lax.fori_loop(0, nt, update, init_val=(psi, pos, vel))
@@ -288,7 +272,7 @@ def main():
     # Plot final state
     fig = plt.figure(figsize=(6, 4), dpi=80)
     ax = fig.add_subplot(111)
-    rho_proj = jnp.mean(jnp.log10(jnp.abs(psi) ** 2), axis=2).T
+    rho_proj = jnp.log10(jnp.mean(jnp.abs(psi) ** 2, axis=2)).T
     plt.imshow(rho_proj, cmap="inferno", origin="lower", extent=(0, nx, 0, ny))
     # plt.clim(2.46, 2.49)
     sx = jax.lax.slice(pos, (0, 0), (n_s, 1)) / Lx * nx
