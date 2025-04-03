@@ -27,6 +27,8 @@ plus star particles (coupled gravitationally).
 
 # TODO: add checkpointing
 # TODO: add distributed support
+# TODO: improve redundant calculations
+# TODO: improve UI
 
 #############
 # Unit System
@@ -100,8 +102,9 @@ k_sq = kx**2 + ky**2 + kz**2
 dt_kin = m_per_hbar / 6.0 * (dx * dy * dz) ** (2.0 / 3.0)
 # round up to the nearest multiple of 100
 nt = int(jnp.ceil(jnp.ceil(t_end / dt_kin) / 100.0) * 100)
-nt_sub = int(jnp.round(nt/100.0)) 
+nt_sub = int(jnp.round(nt / 100.0))
 dt = t_end / nt
+
 
 ##############
 # Checkpointer
@@ -136,7 +139,7 @@ def bin_stars(pos):
     i, ip1, w_i, w_ip1 = get_cic_indicies_and_weights(pos)
 
     def deposit_star(s, rho):
-        # deposit the star mass into the grid
+        """Deposit the star mass into the grid."""
         fac = m_s / (dx * dy * dz)
         rho = rho.at[i[s, 0], i[s, 1], i[s, 2]].add(
             w_i[s, 0] * w_i[s, 1] * w_i[s, 2] * fac
@@ -308,12 +311,6 @@ def main():
     pos = np.random.uniform(0.0, 1.0, (n_s, 3))
     pos = pos * np.array([Lx, Ly, Lz])
     vel = np.random.uniform(-1.0, 1.0, (n_s, 3))
-
-    state = {}
-    state["t"] = t
-    state["psi"] = psi
-    state["pos"] = pos
-    state["vel"] = vel
 
     # Simulation Main Loop
     t_start_timer = time.time()
