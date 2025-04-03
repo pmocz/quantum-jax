@@ -1,8 +1,10 @@
 import jax
 import jax.numpy as jnp
+import orbax.checkpoint as ocp
 import numpy as np
 import matplotlib.pyplot as plt
 import time
+import os
 
 """
 A minimal differentiable Schrodinger-Poisson solver written in JAX
@@ -23,6 +25,8 @@ plus star particles (coupled gravitationally).
 
 """
 
+# TODO: add checkpointing
+# TODO: add distributed support
 
 #############
 # Unit System
@@ -94,12 +98,19 @@ k_sq = kx**2 + ky**2 + kz**2
 
 # Time step
 dt_kin = m_per_hbar / 6.0 * (dx * dy * dz) ** (2.0 / 3.0)
-nt = int(jnp.ceil(t_end / dt_kin))
+# round up to the nearest multiple of 100
+nt = int(jnp.ceil(jnp.ceil(t_end / dt_kin) / 100.0) * 100)
+nt_sub = int(jnp.round(nt/100.0)) 
 dt = t_end / nt
+
+##############
+# Checkpointer
+path = ocp.test_utils.erase_and_create_empty(os.getcwd() + "/checkpoints")
+async_checkpoint_manager = ocp.CheckpointManager(path)
 
 
 def get_potential(rho):
-    # solve the Poisson equation
+    """Solve the Poisson equation."""
     V_hat = -jnp.fft.fftn(4.0 * jnp.pi * G * (rho - rho_bar)) / (k_sq + (k_sq == 0))
     V = jnp.real(jnp.fft.ifftn(V_hat))
 
@@ -107,7 +118,7 @@ def get_potential(rho):
 
 
 def get_cic_indicies_and_weights(pos):
-    # compute the cloud-in-cell indicies and weights for the star positions
+    """Compute the cloud-in-cell indicies and weights for the star positions."""
     dxs = jnp.array([dx, dy, dz])
     i = jnp.floor((pos - 0.5 * dxs) / dxs)
     ip1 = i + 1.0
@@ -120,7 +131,7 @@ def get_cic_indicies_and_weights(pos):
 
 
 def bin_stars(pos):
-    # bin the stars into the grid using cloud-in-cell weights
+    """Bin the stars into the grid using cloud-in-cell weights."""
     rho = jnp.zeros((nx, ny, nz))
     i, ip1, w_i, w_ip1 = get_cic_indicies_and_weights(pos)
 
@@ -159,10 +170,10 @@ def bin_stars(pos):
 
 
 def get_acceleration(pos, rho):
-    # compute the acceleration of the stars
+    """Compute the acceleration of the stars."""
     i, ip1, w_i, w_ip1 = get_cic_indicies_and_weights(pos)
 
-    # accelerations on the grid
+    # find accelerations on the grid
     V_hat = -jnp.fft.fftn(4.0 * jnp.pi * G * (rho - rho_bar)) / (k_sq + (k_sq == 0))
     ax = -jnp.real(jnp.fft.ifftn(1.0j * kx * V_hat))
     ay = -jnp.real(jnp.fft.ifftn(1.0j * ky * V_hat))
@@ -200,8 +211,8 @@ def get_acceleration(pos, rho):
 
 @jax.jit
 def update(_, state):
-    # update the state of the system by one time step
-    psi, pos, vel = state
+    """Update the state of the system by one time step."""
+    psi, pos, vel, t = state
 
     # (1/2) kick
     rho_s = bin_stars(pos)
@@ -229,13 +240,20 @@ def update(_, state):
     acc = get_acceleration(pos, rho)
     vel = vel + acc * dt / 2.0
 
-    return psi, pos, vel
+    # update time
+    t += dt
+
+    # construct state
+    state = (psi, pos, vel, t)
+
+    return state
 
 
 def main():
-    """Physics simulation"""
+    """Main physics simulation."""
 
     # Intial Condition
+    t = 0.0
     amp = 100.0
     sigma = 4.0
     rho = 10.0
@@ -291,11 +309,23 @@ def main():
     pos = pos * np.array([Lx, Ly, Lz])
     vel = np.random.uniform(-1.0, 1.0, (n_s, 3))
 
+    state = {}
+    state["t"] = t
+    state["psi"] = psi
+    state["pos"] = pos
+    state["vel"] = vel
+
     # Simulation Main Loop
-    t0 = time.time()
-    (psi, pos, vel) = jax.lax.fori_loop(0, nt, update, init_val=(psi, pos, vel))
-    jax.block_until_ready(psi)
-    print("Simulation Run Time (s): ", time.time() - t0)
+    t_start_timer = time.time()
+    state = (psi, pos, vel, t)
+    for i in range(100):
+        state = jax.lax.fori_loop(0, nt_sub, update, init_val=state)
+        async_checkpoint_manager.save(i, args=ocp.args.StandardSave(state))
+        # can do other work here in the meantime if you want ...
+        async_checkpoint_manager.wait_until_finished()
+    jax.block_until_ready(state)
+    print("Simulation Run Time (s): ", time.time() - t_start_timer)
+    (psi, pos, vel, t) = state
 
     # Plot final state
     fig = plt.figure(figsize=(6, 4), dpi=80)
