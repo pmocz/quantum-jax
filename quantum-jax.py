@@ -23,8 +23,6 @@ plus star particles (coupled gravitationally).
 
 """
 
-# TODO: checkpointing
-# TODO: check star motions
 
 #############
 # Unit System
@@ -38,9 +36,9 @@ plus star particles (coupled gravitationally).
 # Global Simulation Parameters (input)
 
 # resolution
-nx = 256
-ny = 128
-nz = 32
+nx = 128
+ny = 64
+nz = 16
 
 # box dimensions (in units of kpc)
 Lx = 128.0
@@ -51,7 +49,7 @@ Lz = 16.0
 rho_bar = 300.0
 
 # stop time (in units of kpc / (km/s) = 0.9778 Gyr)
-t_end = 1.0
+t_end = 10.0
 
 # axion mass (in units of 10^-22 eV)
 m_22 = 1.0
@@ -166,9 +164,9 @@ def get_acceleration(pos, rho):
 
     # accelerations on the grid
     V_hat = -jnp.fft.fftn(4.0 * jnp.pi * G * (rho - rho_bar)) / (k_sq + (k_sq == 0))
-    ax = -jnp.real(jnp.fft.ifftn(-1.0j * kx * V_hat))
-    ay = -jnp.real(jnp.fft.ifftn(-1.0j * ky * V_hat))
-    az = -jnp.real(jnp.fft.ifftn(-1.0j * kz * V_hat))
+    ax = -jnp.real(jnp.fft.ifftn(1.0j * kx * V_hat))
+    ay = -jnp.real(jnp.fft.ifftn(1.0j * ky * V_hat))
+    az = -jnp.real(jnp.fft.ifftn(1.0j * kz * V_hat))
     a_grid = jnp.stack((ax, ay, az), axis=-1)
 
     # interpolate the accelerations to the star positions
@@ -238,19 +236,19 @@ def main():
     """Physics simulation"""
 
     # Intial Condition
-    amp = 10.0
-    sigma = 0.5
-    rho = 300.0
+    amp = 100.0
+    sigma = 4.0
+    rho = 10.0
     rho += (
         2.0
         * amp
-        * jnp.exp(-((X - 0.5 * Lx) ** 2 + (Y - 0.25 * Ly) ** 2) / 2.0 / sigma**2)
+        * jnp.exp(-((X - 0.5 * Lx) ** 2 + (Y - 0.4 * Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
     rho += (
         1.5
         * amp
-        * jnp.exp(-((X - 0.2 * Lx) ** 2 + (Y - 0.3 * Ly) ** 2) / 2.0 / sigma**2)
+        * jnp.exp(-((X - 0.6 * Lx) ** 2 + (Y - 0.5 * Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
     rho += (
@@ -260,27 +258,27 @@ def main():
     )
     rho += (
         amp
-        * jnp.exp(-((X - 0.6 * Lx) ** 2 + (Y - 0.24 * Ly) ** 2) / 2.0 / sigma**2)
+        * jnp.exp(-((X - 0.6 * Lx) ** 2 + (Y - 0.4 * Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
     rho += (
         amp
-        * jnp.exp(-((X - 0.8 * Lx) ** 2 + (Y - 0.8 * Ly) ** 2) / 2.0 / sigma**2)
+        * jnp.exp(-((X - 0.6 * Lx) ** 2 + (Y - 0.6 * Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
     rho += (
         amp
-        * jnp.exp(-((X - 0.6 * Lx) ** 2 + (Y - 0.27 * Ly) ** 2) / 2.0 / sigma**2)
+        * jnp.exp(-((X - 0.6 * Lx) ** 2 + (Y - 0.4 * Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
     rho += (
         amp
-        * jnp.exp(-((X - 0.7 * Lx) ** 2 + (Y - 0.74 * Ly) ** 2) / 2.0 / sigma**2)
+        * jnp.exp(-((X - 0.5 * Lx) ** 2 + (Y - 0.4 * Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
     rho += (
         amp
-        * jnp.exp(-((X - 0.3 * Lx) ** 2 + (Y - 0.3 * Ly) ** 2) / 2.0 / sigma**2)
+        * jnp.exp(-((X - 0.5 * Lx) ** 2 + (Y - 0.4 * Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
     # normalize wavefunction to <|psi|^2>=rho_bar
@@ -304,7 +302,7 @@ def main():
     ax = fig.add_subplot(111)
     rho_proj = jnp.log10(jnp.mean(jnp.abs(psi) ** 2, axis=2)).T
     plt.imshow(rho_proj, cmap="inferno", origin="lower", extent=(0, nx, 0, ny))
-    # plt.clim(2.46, 2.49)
+    # plt.clim(2.45, 2.51)
     sx = jax.lax.slice(pos, (0, 0), (n_s, 1)) / Lx * nx
     sy = jax.lax.slice(pos, (0, 1), (n_s, 2)) / Ly * ny
     plt.plot(sx, sy, color="cyan", marker=".", linestyle="None", markersize=1)
