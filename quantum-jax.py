@@ -112,7 +112,7 @@ def bin_stars(pos):
     # bin the stars into the grid using cloud-in-cell weights
     rho = jnp.zeros((nx, ny, nz))
     dxs = jnp.array([dx, dy, dz])
-    i = jnp.floor((pos - 0.5*dxs) / dxs )
+    i = jnp.floor((pos - 0.5 * dxs) / dxs)
     ip1 = i + 1.0
     weight_i = ((ip1 + 0.5) * dxs - pos) / dxs
     weight_ip1 = (pos - (i + 0.5) * dxs) / dxs
@@ -143,7 +143,7 @@ def bin_stars(pos):
         rho = rho.at[i[s, 0], ip1[s, 1], ip1[s, 2]].add(
             weight_i[s, 0] * weight_ip1[s, 1] * weight_ip1[s, 2] * fac
         )
-        rho = rho.at[ip1[s, 0], ip1[s, 1], ip1[s, 2]].add( 
+        rho = rho.at[ip1[s, 0], ip1[s, 1], ip1[s, 2]].add(
             weight_ip1[s, 0] * weight_ip1[s, 1] * weight_ip1[s, 2] * fac
         )
         return rho
@@ -153,26 +153,44 @@ def bin_stars(pos):
     return rho
 
 
+
 def get_acceleration(pos, rho):
-    return jnp.zeros_like(pos)
     # compute the acceleration of the stars
-    rho = jnp.reshape(rho, (nx, ny, nz))
-    V = get_potential(rho)
-    V_hat = jnp.fft.fftn(V)
+    dxs = jnp.array([dx, dy, dz])
+    i = jnp.floor((pos - 0.5 * dxs) / dxs)
+    ip1 = i + 1.0
+    weight_i = ((ip1 + 0.5) * dxs - pos) / dxs
+    weight_ip1 = (pos - (i + 0.5) * dxs) / dxs
+    i = jnp.mod(i, jnp.array([nx, ny, nz])).astype(int)
+    ip1 = jnp.mod(ip1, jnp.array([nx, ny, nz])).astype(int)
+
+    V_hat = -jnp.fft.fftn(4.0 * jnp.pi * G * (rho - rho_bar)) / (k_sq + (k_sq == 0))
+
+    # accelerations on the grid
     ax = -jnp.real(jnp.fft.ifftn(-1.0j * kx * V_hat))
     ay = -jnp.real(jnp.fft.ifftn(-1.0j * ky * V_hat))
     az = -jnp.real(jnp.fft.ifftn(-1.0j * kz * V_hat))
+    a_grid = jnp.stack((ax, ay, az), axis=-1)
 
-    acc = jnp.zeros_like(pos)
-    acc[:, 0] = ax[pos[:, 0].astype(int), pos[:, 1].astype(int), pos[:, 2].astype(int)]
-    acc[:, 1] = ay[pos[:, 0].astype(int), pos[:, 1].astype(int), pos[:, 2].astype(int)]
-    acc[:, 2] = az[pos[:, 0].astype(int), pos[:, 1].astype(int), pos[:, 2].astype(int)]
-    # XXX
+
+    # interpolate the accelerations to the star positions
+    acc = jnp.zeros((n_s, 3))
+    acc += (weight_i[:, 0] * weight_i[:, 1] * weight_i[:, 2])[:, None] * a_grid[i[:, 0], i[:, 1], i[:, 2]]
+    acc += (weight_ip1[:, 0] * weight_i[:, 1] * weight_i[:, 2])[:, None] * a_grid[ip1[:, 0], i[:, 1], i[:, 2]]
+    acc += (weight_i[:, 0] * weight_ip1[:, 1] * weight_i[:, 2])[:, None] * a_grid[i[:, 0], ip1[:, 1], i[:, 2]]
+    acc += (weight_i[:, 0] * weight_i[:, 1] * weight_ip1[:, 2])[:, None] * a_grid[i[:, 0], i[:, 1], ip1[:, 2]]
+    acc += (weight_ip1[:, 0] * weight_ip1[:, 1] * weight_i[:, 2])[:, None] * a_grid[ip1[:, 0], ip1[:, 1], i[:, 2]]
+    acc += (weight_ip1[:, 0] * weight_i[:, 1] * weight_ip1[:, 2])[:, None] * a_grid[ip1[:, 0], i[:, 1], ip1[:, 2]]
+    acc += (weight_i[:, 0] * weight_ip1[:, 1] * weight_ip1[:, 2])[:, None] * a_grid[i[:, 0], ip1[:, 1], ip1[:, 2]]
+    acc += (weight_ip1[:, 0] * weight_ip1[:, 1] * weight_ip1[:, 2])[:, None] * a_grid[ip1[:, 0], ip1[:, 1], ip1[:, 2]]
+
     return acc
+
 
 
 @jax.jit
 def update(_, state):
+    # update the state of the system by one time step
     psi, pos, vel = state
 
     # (1/2) kick
