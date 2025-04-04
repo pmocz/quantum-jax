@@ -51,7 +51,7 @@ Ly = 64.0
 Lz = 16.0
 
 # average density (in units of Msun / kpc^3)
-rho_bar = 300.0
+rho_bar = 4000.0
 
 # stop time (in units of kpc / (km/s) = 0.9778 Gyr)
 t_end = 10.0
@@ -73,6 +73,10 @@ ev_to_msun = 8.96215334e-67  # mass of electron volt in [M] | (eV/c^2/mass of su
 m = m_22 * 1.0e-22 * ev_to_msun  # axion mass in [M]
 m_per_hbar = m / hbar  # (~0.052 1/([V][M]))
 m_s = M_s / n_s  # mass of each star particle
+
+h = 0.7  # little-h (dimensionless)
+H0 = 0.1 * h  # Hubble constant in (km/s)/kpc
+rho_crit = 3.0 * H0**2 / (8.0 * np.pi * G)  # critical density in Msun/kpc^3 (~136)
 
 
 ######
@@ -274,15 +278,14 @@ def plot_sim(ax, state):
     """Plot the simulation state."""
     rho_proj = jnp.log10(jnp.mean(jnp.abs(state["psi"]) ** 2, axis=2)).T
     plt.imshow(rho_proj, cmap="inferno", origin="lower", extent=(0, nx, 0, ny))
-    plt.clim(2.45, 2.51)
     sx = jax.lax.slice(state["pos"], (0, 0), (n_s, 1)) / Lx * nx
     sy = jax.lax.slice(state["pos"], (0, 1), (n_s, 2)) / Ly * ny
     plt.plot(sx, sy, color="cyan", marker=".", linestyle="None", markersize=1)
     plt.colorbar(label="log10(|psi|^2)")
+    plt.tight_layout()
     ax.set_aspect("equal")
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
-    plt.tight_layout()
 
 
 def main():

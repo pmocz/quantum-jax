@@ -50,7 +50,7 @@ def main():
             all_rho = np.vstack((all_rho, row_rho))
 
     # imshow all_psi
-    fig = plt.figure(figsize=(14, 6), dpi=80)
+    fig = plt.figure(figsize=(16, 8), dpi=80)
     ax = fig.add_subplot(111)
     plt.imshow(
         np.log10(all_rho),
@@ -58,7 +58,7 @@ def main():
         origin="lower",
         extent=(0, grid_i * nx, 0, grid_j * ny),
     )
-    # plt.plot(sx_all, sy_all, color="cyan", marker=".", linestyle="None", markersize=1)
+    plt.plot(sx_all, sy_all, color="cyan", marker=".", linestyle="None", markersize=1)
     plt.colorbar(label="log10(|psi|^2)")
     ax.set_aspect("equal")
     ax.get_xaxis().set_visible(False)
