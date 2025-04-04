@@ -13,7 +13,7 @@ Flatiron Institute
 
 ##############
 # Checkpointer
-path = os.path.join(os.path.dirname(__file__), "../checkpoints")
+path = os.path.join(os.path.dirname(__file__), "checkpoints")
 async_checkpoint_manager = ocp.CheckpointManager(path)
 
 

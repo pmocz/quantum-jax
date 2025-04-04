@@ -270,6 +270,21 @@ def update(_, state):
     return state
 
 
+def plot_sim(ax, state):
+    """Plot the simulation state."""
+    rho_proj = jnp.log10(jnp.mean(jnp.abs(state["psi"]) ** 2, axis=2)).T
+    plt.imshow(rho_proj, cmap="inferno", origin="lower", extent=(0, nx, 0, ny))
+    plt.clim(2.45, 2.51)
+    sx = jax.lax.slice(state["pos"], (0, 0), (n_s, 1)) / Lx * nx
+    sy = jax.lax.slice(state["pos"], (0, 1), (n_s, 2)) / Ly * ny
+    plt.plot(sx, sy, color="cyan", marker=".", linestyle="None", markersize=1)
+    plt.colorbar(label="log10(|psi|^2)")
+    ax.set_aspect("equal")
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+    plt.tight_layout()
+
+
 def main():
     """Main physics simulation."""
 
@@ -330,6 +345,7 @@ def main():
     pos = pos * np.array([Lx, Ly, Lz])
     vel = np.random.uniform(-1.0, 1.0, (n_s, 3))
 
+    # Construct initial simulation state
     state = {}
     state["t"] = t
     state["psi"] = psi
@@ -337,6 +353,8 @@ def main():
     state["vel"] = vel
 
     # Simulation Main Loop
+    fig = plt.figure(figsize=(6, 4), dpi=80)
+    ax = fig.add_subplot(111)
     t_start_timer = time.time()
     for i in range(100):
         state = jax.lax.fori_loop(0, nt_sub, update, init_val=state)
@@ -347,24 +365,15 @@ def main():
             ),
         )
         # can do other work here in the meantime if you want ...
+        plot_sim(ax, state)
+        plt.pause(0.001)
+        plt.clf()
         async_checkpoint_manager.wait_until_finished()
     jax.block_until_ready(state)
     print("Simulation Run Time (s): ", time.time() - t_start_timer)
 
     # Plot final state
-    fig = plt.figure(figsize=(6, 4), dpi=80)
-    ax = fig.add_subplot(111)
-    rho_proj = jnp.log10(jnp.mean(jnp.abs(state["psi"]) ** 2, axis=2)).T
-    plt.imshow(rho_proj, cmap="inferno", origin="lower", extent=(0, nx, 0, ny))
-    # plt.clim(2.45, 2.51)
-    sx = jax.lax.slice(state["pos"], (0, 0), (n_s, 1)) / Lx * nx
-    sy = jax.lax.slice(state["pos"], (0, 1), (n_s, 2)) / Ly * ny
-    plt.plot(sx, sy, color="cyan", marker=".", linestyle="None", markersize=1)
-    plt.colorbar(label="log10(|psi|^2)")
-    ax.set_aspect("equal")
-    ax.get_xaxis().set_visible(False)
-    ax.get_yaxis().set_visible(False)
-    plt.tight_layout()
+    plot_sim(ax, state)
     plt.savefig("output/quantum.png", dpi=240)
     plt.show()
 
