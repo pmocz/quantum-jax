@@ -25,7 +25,6 @@ plus star particles (coupled gravitationally).
 
 """
 
-# TODO: add checkpointing
 # TODO: add distributed support
 # TODO: improve redundant calculations
 # TODO: improve UI
@@ -110,6 +109,20 @@ dt = t_end / nt
 # Checkpointer
 path = ocp.test_utils.erase_and_create_empty(os.getcwd() + "/checkpoints")
 async_checkpoint_manager = ocp.CheckpointManager(path)
+
+
+############
+# Parameters
+params = {}
+params["Lx"] = Lx
+params["Ly"] = Ly
+params["Lz"] = Lz
+params["nx"] = nx
+params["ny"] = ny
+params["nz"] = nz
+params["m_22"] = m_22
+params["M_s"] = M_s
+params["n_s"] = n_s
 
 
 def get_potential(rho):
@@ -212,11 +225,8 @@ def get_acceleration(pos, rho):
     return acc
 
 
-@jax.jit
-def update(_, state):
-    """Update the state of the system by one time step."""
-    psi, pos, vel, t = state
-
+def compute_step(psi, pos, vel, t):
+    """Compute the next step in the simulation."""
     # (1/2) kick
     rho_s = bin_stars(pos)
     rho = jnp.abs(psi) ** 2 + rho_s
@@ -246,8 +256,16 @@ def update(_, state):
     # update time
     t += dt
 
-    # construct state
-    state = (psi, pos, vel, t)
+    return psi, pos, vel, t
+
+
+@jax.jit
+def update(_, state):
+    """Update the state of the system by one time step."""
+
+    state["psi"], state["pos"], state["vel"], state["t"] = compute_step(
+        state["psi"], state["pos"], state["vel"], state["t"]
+    )
 
     return state
 
@@ -312,26 +330,35 @@ def main():
     pos = pos * np.array([Lx, Ly, Lz])
     vel = np.random.uniform(-1.0, 1.0, (n_s, 3))
 
+    state = {}
+    state["t"] = t
+    state["psi"] = psi
+    state["pos"] = pos
+    state["vel"] = vel
+
     # Simulation Main Loop
     t_start_timer = time.time()
-    state = (psi, pos, vel, t)
     for i in range(100):
         state = jax.lax.fori_loop(0, nt_sub, update, init_val=state)
-        async_checkpoint_manager.save(i, args=ocp.args.StandardSave(state))
+        async_checkpoint_manager.save(
+            i,
+            args=ocp.args.Composite(
+                state=ocp.args.StandardSave(state), params=ocp.args.JsonSave(params)
+            ),
+        )
         # can do other work here in the meantime if you want ...
         async_checkpoint_manager.wait_until_finished()
     jax.block_until_ready(state)
     print("Simulation Run Time (s): ", time.time() - t_start_timer)
-    (psi, pos, vel, t) = state
 
     # Plot final state
     fig = plt.figure(figsize=(6, 4), dpi=80)
     ax = fig.add_subplot(111)
-    rho_proj = jnp.log10(jnp.mean(jnp.abs(psi) ** 2, axis=2)).T
+    rho_proj = jnp.log10(jnp.mean(jnp.abs(state["psi"]) ** 2, axis=2)).T
     plt.imshow(rho_proj, cmap="inferno", origin="lower", extent=(0, nx, 0, ny))
     # plt.clim(2.45, 2.51)
-    sx = jax.lax.slice(pos, (0, 0), (n_s, 1)) / Lx * nx
-    sy = jax.lax.slice(pos, (0, 1), (n_s, 2)) / Ly * ny
+    sx = jax.lax.slice(state["pos"], (0, 0), (n_s, 1)) / Lx * nx
+    sy = jax.lax.slice(state["pos"], (0, 1), (n_s, 2)) / Ly * ny
     plt.plot(sx, sy, color="cyan", marker=".", linestyle="None", markersize=1)
     plt.colorbar(label="log10(|psi|^2)")
     ax.set_aspect("equal")
