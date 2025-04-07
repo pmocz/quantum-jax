@@ -21,12 +21,13 @@ Monthly Notices of the Royal Astronomical Society, 471(4), 4559-4570
 https://doi.org/10.1093/mnras/stx1887
 https://arxiv.org/abs/1705.05845
 
-plus star particles (coupled gravitationally).
+Plus collisionless star particles (coupled gravitationally).
 
 """
 
 # TODO: add distributed support
-# TODO: improve redundant calculations
+# TODO: remove redundant calculations
+# TODO: timestep also includes acceleration
 # TODO: improve UI
 
 #############
@@ -51,7 +52,7 @@ Ly = 64.0
 Lz = 16.0
 
 # average density (in units of Msun / kpc^3)
-rho_bar = 4000.0
+rho_bar = 8000.0
 
 # stop time (in units of kpc / (km/s) = 0.9778 Gyr)
 t_end = 10.0
@@ -61,7 +62,7 @@ m_22 = 1.0
 
 # stars
 M_s = 0.1 * rho_bar * Lx * Ly * Lz  # total mass of stars, in units of Msun
-n_s = 400  # number of star particles
+n_s = 800  # number of star particles
 
 
 ##################
@@ -102,7 +103,8 @@ kz = jnp.fft.ifftshift(kz)
 k_sq = kx**2 + ky**2 + kz**2
 
 # Time step
-dt_kin = m_per_hbar / 6.0 * (dx * dy * dz) ** (2.0 / 3.0)
+dt_fac = 1.0
+dt_kin = dt_fac * m_per_hbar / 6.0 * (dx * dy * dz) ** (2.0 / 3.0)
 # round up to the nearest multiple of 100
 nt = int(jnp.ceil(jnp.ceil(t_end / dt_kin) / 100.0) * 100)
 nt_sub = int(jnp.round(nt / 100.0))
@@ -131,6 +133,7 @@ params["n_s"] = n_s
 
 def get_potential(rho):
     """Solve the Poisson equation."""
+
     V_hat = -jnp.fft.fftn(4.0 * jnp.pi * G * (rho - rho_bar)) / (k_sq + (k_sq == 0))
     V = jnp.real(jnp.fft.ifftn(V_hat))
 
@@ -139,6 +142,7 @@ def get_potential(rho):
 
 def get_cic_indicies_and_weights(pos):
     """Compute the cloud-in-cell indicies and weights for the star positions."""
+
     dxs = jnp.array([dx, dy, dz])
     i = jnp.floor((pos - 0.5 * dxs) / dxs)
     ip1 = i + 1.0
@@ -152,6 +156,7 @@ def get_cic_indicies_and_weights(pos):
 
 def bin_stars(pos):
     """Bin the stars into the grid using cloud-in-cell weights."""
+
     rho = jnp.zeros((nx, ny, nz))
     i, ip1, w_i, w_ip1 = get_cic_indicies_and_weights(pos)
 
@@ -191,6 +196,7 @@ def bin_stars(pos):
 
 def get_acceleration(pos, rho):
     """Compute the acceleration of the stars."""
+
     i, ip1, w_i, w_ip1 = get_cic_indicies_and_weights(pos)
 
     # find accelerations on the grid
@@ -199,6 +205,7 @@ def get_acceleration(pos, rho):
     ay = -jnp.real(jnp.fft.ifftn(1.0j * ky * V_hat))
     az = -jnp.real(jnp.fft.ifftn(1.0j * kz * V_hat))
     a_grid = jnp.stack((ax, ay, az), axis=-1)
+    a_max = jnp.max(jnp.abs(a_grid))
 
     # interpolate the accelerations to the star positions
     acc = jnp.zeros((n_s, 3))
@@ -226,18 +233,19 @@ def get_acceleration(pos, rho):
     acc += (w_ip1[:, 0] * w_ip1[:, 1] * w_ip1[:, 2])[:, None] * a_grid[
         ip1[:, 0], ip1[:, 1], ip1[:, 2]
     ]
-    return acc
+    return acc, a_max
 
 
-def compute_step(psi, pos, vel, t):
+def compute_step(psi, pos, vel, t, a_max):
     """Compute the next step in the simulation."""
+
     # (1/2) kick
     rho_s = bin_stars(pos)
     rho = jnp.abs(psi) ** 2 + rho_s
     V = get_potential(rho)
     psi = jnp.exp(-1.0j * m_per_hbar * dt / 2.0 * V) * psi
 
-    acc = get_acceleration(pos, rho)
+    acc, a_max1 = get_acceleration(pos, rho)
     vel = vel + acc * dt / 2.0
 
     # drift
@@ -254,21 +262,23 @@ def compute_step(psi, pos, vel, t):
     V = get_potential(rho)
     psi = jnp.exp(-1.0j * m_per_hbar * dt / 2.0 * V) * psi
 
-    acc = get_acceleration(pos, rho)
+    acc, a_max2 = get_acceleration(pos, rho)
     vel = vel + acc * dt / 2.0
 
     # update time
     t += dt
 
-    return psi, pos, vel, t
+    a_max = jnp.max(jnp.array([a_max, a_max1, a_max2]))
+
+    return psi, pos, vel, t, a_max
 
 
 @jax.jit
 def update(_, state):
     """Update the state of the system by one time step."""
 
-    state["psi"], state["pos"], state["vel"], state["t"] = compute_step(
-        state["psi"], state["pos"], state["vel"], state["t"]
+    state["psi"], state["pos"], state["vel"], state["t"], state["a_max"] = compute_step(
+        state["psi"], state["pos"], state["vel"], state["t"], state["a_max"]
     )
 
     return state
@@ -276,6 +286,7 @@ def update(_, state):
 
 def plot_sim(ax, state):
     """Plot the simulation state."""
+
     rho_proj = jnp.log10(jnp.mean(jnp.abs(state["psi"]) ** 2, axis=2)).T
     plt.imshow(rho_proj, cmap="inferno", origin="lower", extent=(0, nx, 0, ny))
     sx = jax.lax.slice(state["pos"], (0, 0), (n_s, 1)) / Lx * nx
@@ -354,6 +365,7 @@ def main():
     state["psi"] = psi
     state["pos"] = pos
     state["vel"] = vel
+    state["a_max"] = 0.0
 
     # Simulation Main Loop
     fig = plt.figure(figsize=(6, 4), dpi=80)
@@ -367,7 +379,9 @@ def main():
                 state=ocp.args.StandardSave(state), params=ocp.args.JsonSave(params)
             ),
         )
-        # can do other work here in the meantime if you want ...
+        # timestep check (acceleration criterion)
+        assert dt < 2.0 * jnp.pi / m_per_hbar / dx / state["a_max"]
+        # live plot of the simulation
         plot_sim(ax, state)
         plt.pause(0.001)
         plt.clf()
