@@ -52,7 +52,7 @@ Ly = 64.0
 Lz = 16.0
 
 # average density (in units of Msun / kpc^3)
-rho_bar = 8000.0
+rho_bar = 10000.0
 
 # stop time (in units of kpc / (km/s) = 0.9778 Gyr)
 t_end = 10.0
@@ -62,7 +62,7 @@ m_22 = 1.0
 
 # stars
 M_s = 0.1 * rho_bar * Lx * Ly * Lz  # total mass of stars, in units of Msun
-n_s = 800  # number of star particles
+n_s = 600  # number of star particles
 
 
 ##################
@@ -236,7 +236,7 @@ def get_acceleration(pos, rho):
     return acc, a_max
 
 
-def compute_step(psi, pos, vel, t, a_max):
+def compute_step(psi, pos, vel, t, a_max, dt_s):
     """Compute the next step in the simulation."""
 
     # (1/2) kick
@@ -269,16 +269,29 @@ def compute_step(psi, pos, vel, t, a_max):
     t += dt
 
     a_max = jnp.max(jnp.array([a_max, a_max1, a_max2]))
+    dt_s = jnp.min(jnp.abs(dx / vel))
 
-    return psi, pos, vel, t, a_max
+    return psi, pos, vel, t, a_max, dt_s
 
 
 @jax.jit
 def update(_, state):
     """Update the state of the system by one time step."""
 
-    state["psi"], state["pos"], state["vel"], state["t"], state["a_max"] = compute_step(
-        state["psi"], state["pos"], state["vel"], state["t"], state["a_max"]
+    (
+        state["psi"],
+        state["pos"],
+        state["vel"],
+        state["t"],
+        state["a_max"],
+        state["dt_s"],
+    ) = compute_step(
+        state["psi"],
+        state["pos"],
+        state["vel"],
+        state["t"],
+        state["a_max"],
+        state["dt_s"],
     )
 
     return state
@@ -366,6 +379,7 @@ def main():
     state["pos"] = pos
     state["vel"] = vel
     state["a_max"] = 0.0
+    state["dt_s"] = dt
 
     # Simulation Main Loop
     fig = plt.figure(figsize=(6, 4), dpi=80)
@@ -381,6 +395,7 @@ def main():
         )
         # timestep check (acceleration criterion)
         assert dt < 2.0 * jnp.pi / m_per_hbar / dx / state["a_max"]
+        assert dt < state["dt_s"]
         # live plot of the simulation
         plot_sim(ax, state)
         plt.pause(0.001)
