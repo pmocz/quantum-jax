@@ -133,16 +133,13 @@ params["n_s"] = n_s
 
 def get_potential(rho):
     """Solve the Poisson equation."""
-
     V_hat = -jnp.fft.fftn(4.0 * jnp.pi * G * (rho - rho_bar)) / (k_sq + (k_sq == 0))
     V = jnp.real(jnp.fft.ifftn(V_hat))
-
     return V
 
 
 def get_cic_indicies_and_weights(pos):
     """Compute the cloud-in-cell indicies and weights for the star positions."""
-
     dxs = jnp.array([dx, dy, dz])
     i = jnp.floor((pos - 0.5 * dxs) / dxs)
     ip1 = i + 1.0
@@ -150,13 +147,11 @@ def get_cic_indicies_and_weights(pos):
     weight_ip1 = (pos - (i + 0.5) * dxs) / dxs
     i = jnp.mod(i, jnp.array([nx, ny, nz])).astype(int)
     ip1 = jnp.mod(ip1, jnp.array([nx, ny, nz])).astype(int)
-
     return i, ip1, weight_i, weight_ip1
 
 
 def bin_stars(pos):
     """Bin the stars into the grid using cloud-in-cell weights."""
-
     rho = jnp.zeros((nx, ny, nz))
     i, ip1, w_i, w_ip1 = get_cic_indicies_and_weights(pos)
 
@@ -190,13 +185,11 @@ def bin_stars(pos):
         return rho
 
     rho = jax.lax.fori_loop(0, n_s, deposit_star, rho)
-
     return rho
 
 
 def get_acceleration(pos, rho):
     """Compute the acceleration of the stars."""
-
     i, ip1, w_i, w_ip1 = get_cic_indicies_and_weights(pos)
 
     # find accelerations on the grid
@@ -238,7 +231,6 @@ def get_acceleration(pos, rho):
 
 def compute_step(psi, pos, vel, t, a_max, dt_s):
     """Compute the next step in the simulation."""
-
     # (1/2) kick
     rho_s = bin_stars(pos)
     rho = jnp.abs(psi) ** 2 + rho_s
@@ -268,6 +260,7 @@ def compute_step(psi, pos, vel, t, a_max, dt_s):
     # update time
     t += dt
 
+    # keep track of some quantities
     a_max = jnp.max(jnp.array([a_max, a_max1, a_max2]))
     dt_s = jnp.min(jnp.abs(dx / vel))
 
@@ -277,7 +270,6 @@ def compute_step(psi, pos, vel, t, a_max, dt_s):
 @jax.jit
 def update(_, state):
     """Update the state of the system by one time step."""
-
     (
         state["psi"],
         state["pos"],
@@ -293,13 +285,11 @@ def update(_, state):
         state["a_max"],
         state["dt_s"],
     )
-
     return state
 
 
 def plot_sim(ax, state):
     """Plot the simulation state."""
-
     rho_proj = jnp.log10(jnp.mean(jnp.abs(state["psi"]) ** 2, axis=2)).T
     plt.imshow(rho_proj, cmap="inferno", origin="lower", extent=(0, nx, 0, ny))
     sx = jax.lax.slice(state["pos"], (0, 0), (n_s, 1)) / Lx * nx
@@ -314,7 +304,6 @@ def plot_sim(ax, state):
 
 def main():
     """Main physics simulation."""
-
     # Intial Condition
     t = 0.0
     amp = 100.0
