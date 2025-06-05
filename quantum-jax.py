@@ -138,8 +138,8 @@ def get_potential(rho):
     return V
 
 
-def get_cic_indicies_and_weights(pos):
-    """Compute the cloud-in-cell indicies and weights for the star positions."""
+def get_cic_indices_and_weights(pos):
+    """Compute the cloud-in-cell indices and weights for the star positions."""
     dxs = jnp.array([dx, dy, dz])
     i = jnp.floor((pos - 0.5 * dxs) / dxs)
     ip1 = i + 1.0
@@ -153,7 +153,7 @@ def get_cic_indicies_and_weights(pos):
 def bin_stars(pos):
     """Bin the stars into the grid using cloud-in-cell weights."""
     rho = jnp.zeros((nx, ny, nz))
-    i, ip1, w_i, w_ip1 = get_cic_indicies_and_weights(pos)
+    i, ip1, w_i, w_ip1 = get_cic_indices_and_weights(pos)
 
     def deposit_star(s, rho):
         """Deposit the star mass into the grid."""
@@ -190,7 +190,7 @@ def bin_stars(pos):
 
 def get_acceleration(pos, rho):
     """Compute the acceleration of the stars."""
-    i, ip1, w_i, w_ip1 = get_cic_indicies_and_weights(pos)
+    i, ip1, w_i, w_ip1 = get_cic_indices_and_weights(pos)
 
     # find accelerations on the grid
     V_hat = -jnp.fft.fftn(4.0 * jnp.pi * G * (rho - rho_bar)) / (k_sq + (k_sq == 0))
@@ -304,7 +304,7 @@ def plot_sim(ax, state):
 
 def main():
     """Main physics simulation."""
-    # Intial Condition
+    # Initial Condition
     t = 0.0
     amp = 100.0
     sigma = 4.0
