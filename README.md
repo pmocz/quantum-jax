@@ -11,7 +11,7 @@ A simple differentiable Schrodinger-Poisson solver written in JAX
 Check out the code: 
 
 ```console
-git@github.com:pmocz/quantum-jax.git
+git clone git@github.com:pmocz/quantum-jax.git
 ```
 
 Install dependencies:
