@@ -14,6 +14,12 @@ Check out the code:
 git clone git@github.com:pmocz/quantum-jax.git
 ```
 
+Go into the folder:
+
+```console
+cd quantum-jax
+```
+
 Install dependencies:
 
 ```console
@@ -34,7 +40,13 @@ Check out the code:
 git clone git@github.com:pmocz/quantum-jax.git
 ```
 
-Make a virtual environment (make sure your `~/.bashrc` file contains `export VENVDIR=/mnt/home/USER_NAME/FOLDER_TO_YOUR_ENVIRONMENTS`):
+Go into the folder:
+
+```console
+cd quantum-jax
+```
+
+Make a virtual environment (make sure your `~/.bashrc` file contains `export VENVDIR=/mnt/home/USER_NAME/FOLDER_TO_YOUR_ENVIRONMENTS`) -- this is a one-time setup:
 
 ```console
 module purge
@@ -45,7 +57,7 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-Submit a job
+Submit a job:
 
 ```console
 sbatch quantum-jax.py
