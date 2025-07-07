@@ -25,6 +25,11 @@ https://arxiv.org/abs/1705.05845
 
 Plus collisionless star particles (coupled gravitationally).
 
+Example Usage:
+
+python quantum-jax.py --res_factor 1
+python quantum-jax.py --res_factor 1 --live_plot
+
 """
 
 # TODO: add distributed support
@@ -46,6 +51,9 @@ Plus collisionless star particles (coupled gravitationally).
 # command line input:
 parser = argparse.ArgumentParser(description="Simulate the Schrodinger-Poisson system.")
 parser.add_argument("--res_factor", type=int, default=1, help="Resolution factor")
+parser.add_argument(
+    "--live_plot", action="store_true", help="Enable live plotting during simulation"
+)
 args = parser.parse_args()
 
 # resolution
@@ -384,8 +392,8 @@ def main():
     state["dt_s"] = dt
 
     # Simulation Main Loop
-    # fig = plt.figure(figsize=(6, 4), dpi=80)
-    # ax = fig.add_subplot(111)
+    fig = plt.figure(figsize=(6, 4), dpi=80)
+    ax = fig.add_subplot(111)
     print("Starting simulation ...")
     with open("checkpoints/params.json", "w") as f:
         json.dump(params, f, indent=2)
@@ -403,17 +411,19 @@ def main():
         assert dt < 2.0 * jnp.pi / m_per_hbar / dx / state["a_max"]
         assert dt < state["dt_s"]
         # live plot of the simulation
-        # plot_sim(ax, state)
-        # plt.pause(0.001)
-        # plt.clf()
+        if args.live_plot:
+            plot_sim(ax, state)
+            plt.pause(0.001)
+            plt.clf()
         async_checkpoint_manager.wait_until_finished()
     jax.block_until_ready(state)
     print("Simulation Run Time (s): ", time.time() - t_start_timer)
 
     # Plot final state
-    # plot_sim(ax, state)
-    # plt.savefig("output/quantum.png", dpi=240)
-    # plt.show()
+    plot_sim(ax, state)
+    plt.savefig("output/quantum.png", dpi=240)
+    if args.live_plot:
+        plt.show()
 
 
 if __name__ == "__main__":

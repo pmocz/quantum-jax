@@ -19,4 +19,4 @@ export PYTHONUNBUFFERED=TRUE
 
 source $VENVDIR/quantum-jax-venv/bin/activate
 
-srun python quantum-jax.py --res_factor=2
+srun python quantum-jax.py --res_factor=4
