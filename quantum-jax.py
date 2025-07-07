@@ -399,6 +399,7 @@ def main():
         json.dump(params, f, indent=2)
     t_start_timer = time.time()
     for i in range(100):
+        print(f"step {i}")
         state = jax.lax.fori_loop(0, nt_sub, update, init_val=state)
         async_checkpoint_manager.save(
             i,

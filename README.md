@@ -23,7 +23,7 @@ pip install -r requirements.txt
 Run the simulation:
 
 ```console
-python quantum-jax.py
+python quantum-jax.py --live_plot
 ```
 
 ## How to Run (On Rusty)
@@ -50,3 +50,14 @@ Submit a job
 ```console
 sbatch quantum-jax.py
 ```
+
+## Plot checkpoints
+
+Plot the results by running the script:
+
+```console
+python plot_checkpoints.py
+```
+
+which generates the figure:
+
