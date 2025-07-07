@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 import os
+import argparse
 
 """
 A minimal differentiable Schrodinger-Poisson solver written in JAX
@@ -41,6 +42,16 @@ Plus collisionless star particles (coupled gravitationally).
 ######################################
 # Global Simulation Parameters (input)
 
+# command line input:
+parser = argparse.ArgumentParser(description="Simulate the Schrodinger-Poisson system.")
+parser.add_argument("--res_factor", type=int, default=1, help="Resolution factor")
+args = parser.parse_args()
+
+# resolution
+nx = 128 * args.res_factor
+ny = 64 * args.res_factor
+nz = 16 * args.res_factor
+
 # resolution
 nx = 128
 ny = 64
@@ -62,7 +73,7 @@ m_22 = 1.0
 
 # stars
 M_s = 0.1 * rho_bar * Lx * Ly * Lz  # total mass of stars, in units of Msun
-n_s = 600  # number of star particles
+n_s = 600 * args.res_factor  # number of star particles
 
 
 ##################
@@ -371,8 +382,9 @@ def main():
     state["dt_s"] = dt
 
     # Simulation Main Loop
-    fig = plt.figure(figsize=(6, 4), dpi=80)
-    ax = fig.add_subplot(111)
+    #fig = plt.figure(figsize=(6, 4), dpi=80)
+    #ax = fig.add_subplot(111)
+    print("Starting simulation ...")
     t_start_timer = time.time()
     for i in range(100):
         state = jax.lax.fori_loop(0, nt_sub, update, init_val=state)
@@ -386,17 +398,17 @@ def main():
         assert dt < 2.0 * jnp.pi / m_per_hbar / dx / state["a_max"]
         assert dt < state["dt_s"]
         # live plot of the simulation
-        plot_sim(ax, state)
-        plt.pause(0.001)
-        plt.clf()
+        # plot_sim(ax, state)
+        # plt.pause(0.001)
+        # plt.clf()
         async_checkpoint_manager.wait_until_finished()
     jax.block_until_ready(state)
     print("Simulation Run Time (s): ", time.time() - t_start_timer)
 
     # Plot final state
-    plot_sim(ax, state)
-    plt.savefig("output/quantum.png", dpi=240)
-    plt.show()
+    # plot_sim(ax, state)
+    # plt.savefig("output/quantum.png", dpi=240)
+    # plt.show()
 
 
 if __name__ == "__main__":

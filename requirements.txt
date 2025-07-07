@@ -1,5 +1,4 @@
-jax==0.6.0
-orbax==0.1.9
-orbax-checkpoint==0.11.10
+jax[cuda12]==0.4.26
+orbax-checkpoint==0.6.4
 numpy
 matplotlib

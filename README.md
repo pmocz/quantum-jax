@@ -6,7 +6,7 @@ Authors: [Philip Mocz (@pmocz)](https://github.com/pmocz/), [Eric Ludwig (@TheRe
 
 A simple differentiable Schrodinger-Poisson solver written in JAX
 
-## How to Run
+## How to Run (Locally)
 
 Check out the code: 
 
@@ -26,3 +26,27 @@ Run the simulation:
 python quantum-jax.py
 ```
 
+## How to Run (On Rusty)
+
+Check out the code: 
+
+```console
+git clone git@github.com:pmocz/quantum-jax.git
+```
+
+Make a virtual environment (make sure your `~/.bashrc` file contains `export VENVDIR=/mnt/home/USER_NAME/FOLDER_TO_YOUR_ENVIRONMENTS`):
+
+```console
+module purge
+module load python/3.11
+python -m venv --system-site-packages $VENVDIR/quantum-jax-venv
+source $VENVDIR/quantum-jax-venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+Submit a job
+
+```console
+sbatch quantum-jax.py
+```
