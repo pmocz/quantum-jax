@@ -3,6 +3,7 @@ import orbax.checkpoint as ocp
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+import json
 
 """
 Plot checkpointed data.
@@ -27,19 +28,25 @@ def main():
     for i in range(grid_i):
         row_rho = np.array([])
         for j in range(grid_j):
+            # Load the parameters
+            params_path = os.path.join(path, "params.json")
+            if not os.path.exists(params_path):
+                raise FileNotFoundError(f"Parameters file not found: {params_path}")
+            with open(params_path, "r") as f:
+                params = json.load(f)
             # Load the checkpoint
             restored = async_checkpoint_manager.restore(i * grid_j + j)
-            rho = np.mean(np.abs(restored.state["psi"]) ** 2, axis=2).T
+            rho = np.mean(np.abs(restored["psi"]) ** 2, axis=2).T
             if row_rho.size == 0:
                 row_rho = rho
             else:
                 row_rho = np.hstack((row_rho, rho))
-            nx = restored.params["nx"]
-            ny = restored.params["ny"]
-            Lx = restored.params["Lx"]
-            Ly = restored.params["Ly"]
-            n_s = restored.params["n_s"]
-            pos = restored.state["pos"]
+            nx = params["nx"]
+            ny = params["ny"]
+            Lx = params["Lx"]
+            Ly = params["Ly"]
+            n_s = params["n_s"]
+            pos = restored["pos"]
             sx = jax.lax.slice(pos, (0, 0), (n_s, 1)) / Lx * nx
             sy = jax.lax.slice(pos, (0, 1), (n_s, 2)) / Ly * ny
             sx_all = np.append(sx_all, sx + i * nx)

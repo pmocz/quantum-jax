@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import time
 import os
 import argparse
+import json
 
 """
 A minimal differentiable Schrodinger-Poisson solver written in JAX
@@ -124,8 +125,9 @@ dt = t_end / nt
 
 ##############
 # Checkpointer
+options = ocp.CheckpointManagerOptions()
 path = ocp.test_utils.erase_and_create_empty(os.getcwd() + "/checkpoints")
-async_checkpoint_manager = ocp.CheckpointManager(path)
+async_checkpoint_manager = ocp.CheckpointManager(path, options=options)
 
 
 ############
@@ -382,17 +384,20 @@ def main():
     state["dt_s"] = dt
 
     # Simulation Main Loop
-    #fig = plt.figure(figsize=(6, 4), dpi=80)
-    #ax = fig.add_subplot(111)
+    # fig = plt.figure(figsize=(6, 4), dpi=80)
+    # ax = fig.add_subplot(111)
     print("Starting simulation ...")
+    with open("checkpoints/params.json", "w") as f:
+        json.dump(params, f, indent=2)
     t_start_timer = time.time()
     for i in range(100):
         state = jax.lax.fori_loop(0, nt_sub, update, init_val=state)
         async_checkpoint_manager.save(
             i,
-            args=ocp.args.Composite(
-                state=ocp.args.StandardSave(state), params=ocp.args.JsonSave(params)
-            ),
+            # args=ocp.args.Composite(
+            #    state=ocp.args.StandardSave(state), params=ocp.args.JsonSave(params)
+            # ),
+            args=ocp.args.StandardSave(state),
         )
         # timestep check (acceleration criterion)
         assert dt < 2.0 * jnp.pi / m_per_hbar / dx / state["a_max"]
