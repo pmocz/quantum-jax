@@ -59,5 +59,6 @@ Plot the results by running the script:
 python plot_checkpoints.py
 ```
 
-which generates the figure:
+Below is an example of a snapshot from a simulation:
 
+![Example output figure](example_output.png)
