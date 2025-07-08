@@ -12,11 +12,10 @@
 #SBATCH --time=00-00:20
 
 module purge
-module load cuda
-module load python
+module load python/3.11
 
 export PYTHONUNBUFFERED=TRUE
 
 source $VENVDIR/quantum-jax-venv/bin/activate
 
-srun python quantum-jax.py --res_factor=4
+srun python quantum-jax.py --res_factor=8

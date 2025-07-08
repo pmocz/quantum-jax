@@ -176,5 +176,5 @@ cython_debug/
 # extras
 .DS_Store
 output/
-checkpoints
+checkpoint*
 slurm*

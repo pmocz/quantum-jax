@@ -134,7 +134,8 @@ dt = t_end / nt
 ##############
 # Checkpointer
 options = ocp.CheckpointManagerOptions()
-path = ocp.test_utils.erase_and_create_empty(os.getcwd() + "/checkpoints")
+checkpoint_dir = f"checkpoints{args.res_factor}"
+path = ocp.test_utils.erase_and_create_empty(os.getcwd() + "/" + checkpoint_dir)
 async_checkpoint_manager = ocp.CheckpointManager(path, options=options)
 
 
@@ -395,7 +396,7 @@ def main():
     fig = plt.figure(figsize=(6, 4), dpi=80)
     ax = fig.add_subplot(111)
     print("Starting simulation ...")
-    with open("checkpoints/params.json", "w") as f:
+    with open(checkpoint_dir + "/params.json", "w") as f:
         json.dump(params, f, indent=2)
     t_start_timer = time.time()
     for i in range(100):
@@ -422,7 +423,7 @@ def main():
 
     # Plot final state
     plot_sim(ax, state)
-    plt.savefig("output/quantum.png", dpi=240)
+    plt.savefig("checkpoint_dir" + "/quantum.png", dpi=240)
     if args.live_plot:
         plt.show()
 
