@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[ ]:
-
-
 import jax
 import jax.numpy as jnp
 import orbax.checkpoint as ocp
