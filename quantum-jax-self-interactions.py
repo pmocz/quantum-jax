@@ -96,12 +96,12 @@ m_s = M_s / n_s  # mass of each star particle
 
 # self-interaction coefficient
 if args.self_interaction:
-    f15 = 1.5
+    f15 = 1.5  # lower to increase self-interaction strength
     cm_to_kpc = 3.240779289e-22
     hbarc_cm = 1.973269788e-5
     a_s_cm = (m_22 * 1e-22) * hbarc_cm / (32 * np.pi * (f15 * 1e24) ** 2)
     a_s_kpc = a_s_cm * cm_to_kpc
-    b_coeff = -4 * np.pi * hbar ** 2 * a_s_kpc / m ** 3
+    b_coeff = -4 * np.pi * hbar ** 2 * a_s_kpc / m ** 3  # attractive self-interactions
 else:
     b_coeff = 0.0
 
