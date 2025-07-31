@@ -163,11 +163,11 @@ params["M_s"] = M_s
 params["n_s"] = n_s
 
 
-def get_potential(rho, psi):
+def get_potential(rho):
     """Solve the Poisson equation."""
     V_hat = -jnp.fft.fftn(4.0 * jnp.pi * G * (rho - rho_bar)) / (k_sq + (k_sq == 0))
     V = jnp.real(jnp.fft.ifftn(V_hat))
-    return V + b_coeff * jnp.abs(psi) ** 2 if args.self_interaction else V
+    return V + b_coeff * rho if args.self_interaction else V
 
 
 def get_cic_indices_and_weights(pos):
@@ -194,7 +194,7 @@ def bin_stars(pos):
             w_i[s, 0] * w_i[s, 1] * w_i[s, 2] * fac
         )
         rho = rho.at[ip1[s, 0], i[s, 1], i[s, 2]].add(
-            w_ip1[s, 0] * w_ip1[s, 1] * w_ip1[s, 2] * fac
+            w_ip1[s, 0] * w_i[s, 1] * w_i[s, 2] * fac
         )
         rho = rho.at[i[s, 0], ip1[s, 1], i[s, 2]].add(
             w_i[s, 0] * w_ip1[s, 1] * w_i[s, 2] * fac
@@ -266,7 +266,7 @@ def compute_step(psi, pos, vel, t, a_max, dt_s):
     # (1/2) kick
     rho_s = bin_stars(pos)
     rho = jnp.abs(psi) ** 2 + rho_s
-    V = get_potential(rho, psi)
+    V = get_potential(rho)
     psi = jnp.exp(-1.0j * m_per_hbar * dt / 2.0 * V) * psi
 
     acc, a_max1 = get_acceleration(pos, rho)
@@ -283,7 +283,7 @@ def compute_step(psi, pos, vel, t, a_max, dt_s):
     # (1/2) kick
     rho_s = bin_stars(pos)
     rho = jnp.abs(psi) ** 2 + rho_s
-    V = get_potential(rho, psi)
+    V = get_potential(rho)
     psi = jnp.exp(-1.0j * m_per_hbar * dt / 2.0 * V) * psi
 
     acc, a_max2 = get_acceleration(pos, rho)
