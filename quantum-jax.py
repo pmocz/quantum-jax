@@ -38,10 +38,10 @@ python quantum-jax.py --res_factor 1 --live_plot
 
 # TODO: add distributed support
 # TODO: remove redundant calculations
-# TODO: timestep limit also includes acceleration
-# TODO: improve UI
+# TODO: adaptive timesteps (acceleration, stars, cfl), instead of a posteriori checks
+# TODO: clean up UI
 # TODO: add cosmology
-# TODO: add isothermal fluid equation (coupled gravitationally)
+# TODO: isothermal fluid equation (coupled gravitationally)
 
 
 #############
@@ -63,15 +63,13 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
+# Enable for double precision
+# jax.config.update("jax_enable_x64", True)
+
 # resolution
 nx = 128 * args.res_factor
 ny = 64 * args.res_factor
 nz = 16 * args.res_factor
-
-# resolution
-nx = 128
-ny = 64
-nz = 16
 
 # box dimensions (in units of kpc)
 Lx = 128.0
@@ -118,6 +116,7 @@ rho_crit = 3.0 * H0**2 / (8.0 * np.pi * G)  # critical density in Msun/kpc^3 (~1
 dx = Lx / nx
 dy = Ly / ny
 dz = Lz / nz
+vol = dx * dy * dz  # volume of each cell
 x_lin = jnp.linspace(0.5 * dx, Lx - 0.5 * dx, nx)
 y_lin = jnp.linspace(0.5 * dy, Ly - 0.5 * dy, ny)
 z_lin = jnp.linspace(0.5 * dz, Lz - 0.5 * dz, nz)
@@ -160,8 +159,15 @@ params["nx"] = nx
 params["ny"] = ny
 params["nz"] = nz
 params["m_22"] = m_22
+params["rho_bar"] = rho_bar
+params["t_end"] = t_end
 params["M_s"] = M_s
+params["frac_s"] = frac_s
+params["frac_dm"] = frac_dm
 params["n_s"] = n_s
+
+#########
+# Gravity
 
 
 def get_potential(rho):
@@ -169,6 +175,10 @@ def get_potential(rho):
     V_hat = -jnp.fft.fftn(4.0 * jnp.pi * G * (rho - rho_bar)) / (k_sq + (k_sq == 0))
     V = jnp.real(jnp.fft.ifftn(V_hat))
     return V
+
+
+#######
+# Stars
 
 
 def get_cic_indices_and_weights(pos):
@@ -262,6 +272,10 @@ def get_acceleration(pos, rho):
     return acc, a_max
 
 
+#######################
+# Main part of the code
+
+
 def compute_step(psi, pos, vel, t, a_max, dt_s):
     """Compute the next step in the simulation."""
     # (1/2) kick
@@ -338,56 +352,58 @@ def plot_sim(ax, state):
 def main():
     """Main physics simulation."""
 
-    # Initial Condition
+    # Initial Conditions
     t = 0.0
+
+    # dark matter
     amp = 100.0
     sigma = 4.0
-    rho = 10.0
-    rho += (
+    rho_dm = 10.0
+    rho_dm += (
         2.0
         * amp
         * jnp.exp(-((X - 0.5 * Lx) ** 2 + (Y - 0.4 * Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
-    rho += (
+    rho_dm += (
         1.5
         * amp
         * jnp.exp(-((X - 0.6 * Lx) ** 2 + (Y - 0.5 * Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
-    rho += (
+    rho_dm += (
         amp
         * jnp.exp(-((X - 0.4 * Lx) ** 2 + (Y - 0.6 * Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
-    rho += (
+    rho_dm += (
         amp
         * jnp.exp(-((X - 0.6 * Lx) ** 2 + (Y - 0.4 * Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
-    rho += (
+    rho_dm += (
         amp
         * jnp.exp(-((X - 0.6 * Lx) ** 2 + (Y - 0.6 * Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
-    rho += (
+    rho_dm += (
         amp
         * jnp.exp(-((X - 0.6 * Lx) ** 2 + (Y - 0.4 * Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
-    rho += (
+    rho_dm += (
         amp
         * jnp.exp(-((X - 0.5 * Lx) ** 2 + (Y - 0.4 * Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
-    rho += (
+    rho_dm += (
         amp
         * jnp.exp(-((X - 0.5 * Lx) ** 2 + (Y - 0.4 * Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
     # normalize wavefunction to <|psi|^2>=frac_dm*rho_bar
-    rho *= frac_dm * rho_bar / jnp.mean(rho)
-    psi = jnp.sqrt(rho) + 0.0j
+    rho_dm *= frac_dm * rho_bar / jnp.mean(rho_dm)
+    psi = jnp.sqrt(rho_dm) + 0.0j
 
     # stars have random positions and velocities
     np.random.seed(17)
@@ -415,7 +431,7 @@ def main():
         print(f"step {i}")
         state = jax.lax.fori_loop(0, nt_sub, update, init_val=state)
         async_checkpoint_manager.save(i, args=ocp.args.StandardSave(state))
-        # timestep check (acceleration criterion)
+        # a posteriori timestep check (acceleration criterion)
         assert dt < 2.0 * jnp.pi / m_per_hbar / dx / state["a_max"]
         assert dt < state["dt_s"]
         # live plot of the simulation
