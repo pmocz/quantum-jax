@@ -29,7 +29,7 @@ pip install -r requirements.txt
 Run the simulation:
 
 ```console
-python quantum-jax.py --live_plot
+python quantum-jax.py --show
 ```
 
 ## How to Run (On Rusty)

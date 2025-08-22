@@ -31,7 +31,7 @@ Optional:
 Example Usage:
 
 python quantum-jax.py --res_factor 1
-python quantum-jax.py --res_factor 1 --live_plot
+python quantum-jax.py --res_factor 1 --show
 python quantum-jax.py --res_factor 1 --self_interaction
 
 """
@@ -60,7 +60,7 @@ python quantum-jax.py --res_factor 1 --self_interaction
 parser = argparse.ArgumentParser(description="Simulate the Schrodinger-Poisson system.")
 parser.add_argument("--res_factor", type=int, default=1, help="Resolution factor")
 parser.add_argument(
-    "--live_plot", action="store_true", help="Enable live plotting during simulation"
+    "--show", action="store_true", help="Enable live plotting during simulation"
 )
 parser.add_argument(
     "--self_interaction", action="store_true", help="Enable quartic self-interaction"
@@ -451,7 +451,7 @@ def main():
         assert dt < 2.0 * jnp.pi / m_per_hbar / dx / state["a_max"]
         assert dt < state["dt_s"]
         # live plot of the simulation
-        if args.live_plot:
+        if args.show:
             plot_sim(ax, state)
             plt.pause(0.001)
             plt.clf()
@@ -462,7 +462,7 @@ def main():
     # Plot final state
     plot_sim(ax, state)
     plt.savefig(checkpoint_dir + "/quantum.png", dpi=240)
-    if args.live_plot:
+    if args.show:
         plt.show()
 
 
