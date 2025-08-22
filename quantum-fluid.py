@@ -390,20 +390,45 @@ def update(_, state):
     return state
 
 
-def plot_sim(ax, state):
+def plot_sim(axs, state):
     """Plot the simulation state."""
-    rho_proj_dm = jnp.log10(jnp.mean(jnp.abs(state["psi"]) ** 2, axis=2)).T
-    rho_proj_gas = jnp.log10(jnp.mean(state["rho"], axis=2)).T
-    rho_proj_stacked = jnp.concatenate([rho_proj_dm, rho_proj_gas], axis=1)
-    plt.imshow(
-        rho_proj_stacked, cmap="inferno", origin="lower", extent=(0, 2 * nx, 0, nx)
+    # DM projection
+    rho_proj_dm = jnp.log10(jnp.mean(jnp.abs(state["psi"]) ** 2, axis=2))
+    vmin = jnp.log10(rho_bar * frac_dm * 0.5)
+    vmax = jnp.log10(rho_bar * frac_dm * 2.0)
+    axs[0].imshow(
+        rho_proj_dm,
+        cmap="inferno",
+        origin="lower",
+        extent=(0, nx, 0, nx),
+        vmin=vmin,
+        vmax=vmax,
     )
-    plt.colorbar(label="log10(rho)")
-    plt.clim(3, 4)
+    # plt.colorbar(im0, ax=axs[0], label="log10(rho_dm)")
+    axs[0].set_aspect("equal")
+    axs[0].get_xaxis().set_visible(False)
+    axs[0].get_yaxis().set_visible(False)
+
+    # Gas projection
+    rho_proj_gas = jnp.log10(jnp.mean(state["rho"], axis=2))
+    vmin = jnp.log10(rho_bar * frac_gas * 0.9)
+    vmax = jnp.log10(rho_bar * frac_gas * 1.1)
+    axs[1].imshow(
+        rho_proj_gas,
+        cmap="viridis",
+        origin="lower",
+        extent=(0, nx, 0, nx),
+        vmin=vmin,
+        vmax=vmax,
+    )
+    # plt.colorbar(im1, ax=axs[1], label="log10(rho_gas)")
+    axs[1].set_aspect("equal")
+    axs[1].get_xaxis().set_visible(False)
+    axs[1].get_yaxis().set_visible(False)
+
     plt.tight_layout()
-    ax.set_aspect("equal")
-    ax.get_xaxis().set_visible(False)
-    ax.get_yaxis().set_visible(False)
+    if args.show:
+        plt.pause(0.001)
 
 
 def main():
@@ -439,8 +464,7 @@ def main():
     state["vz"] = vz
 
     # Simulation Main Loop
-    fig = plt.figure(figsize=(6, 4), dpi=80)
-    ax = fig.add_subplot(111)
+    fig, axs = plt.subplots(1, 2, figsize=(12, 4), dpi=80)
     print("Starting simulation ...")
     with open(checkpoint_dir + "/params.json", "w") as f:
         json.dump(params, f, indent=2)
@@ -451,15 +475,13 @@ def main():
         async_checkpoint_manager.save(i, args=ocp.args.StandardSave(state))
         # live plot of the simulation
         if args.show:
-            plot_sim(ax, state)
-            plt.pause(0.001)
-            plt.clf()
+            plot_sim(axs, state)
         async_checkpoint_manager.wait_until_finished()
     jax.block_until_ready(state)
     print("Simulation Run Time (s): ", time.time() - t_start_timer)
 
     # Plot final state
-    plot_sim(ax, state)
+    plot_sim(axs, state)
     plt.savefig(checkpoint_dir + "/final.png", dpi=240)
     if args.show:
         plt.show()

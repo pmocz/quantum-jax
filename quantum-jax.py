@@ -463,7 +463,7 @@ def main():
 
     # Plot final state
     plot_sim(ax, state)
-    plt.savefig(checkpoint_dir + "/quantum.png", dpi=240)
+    plt.savefig(checkpoint_dir + "/final.png", dpi=240)
     if args.show:
         plt.show()
 
