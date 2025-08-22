@@ -110,7 +110,7 @@ m_s = M_s / n_s  # mass of each star particle
 
 h = 0.7  # little-h (dimensionless)
 H0 = 0.1 * h  # Hubble constant in (km/s)/kpc
-rho_crit = 3.0 * H0**2 / (8.0 * np.pi * G)  # critical density in Msun/kpc^3 (~136)
+rho_crit = 3.0 * H0**2 / (8.0 * jnp.pi * G)  # critical density in Msun/kpc^3 (~136)
 
 
 # self-interaction coefficient
@@ -118,9 +118,9 @@ if args.self_interaction:
     f15 = 1.5  # lower to increase self-interaction strength
     cm_to_kpc = 3.240779289e-22
     hbarc_cm = 1.973269788e-5
-    a_s_cm = (m_22 * 1e-22) * hbarc_cm / (32.0 * np.pi * (f15 * 1e24) ** 2)
+    a_s_cm = (m_22 * 1e-22) * hbarc_cm / (32.0 * jnp.pi * (f15 * 1e24) ** 2)
     a_s_kpc = a_s_cm * cm_to_kpc
-    b_coeff = -4.0 * np.pi * hbar**2 * a_s_kpc / m**3  # attractive self-interactions
+    b_coeff = -4.0 * jnp.pi * hbar**2 * a_s_kpc / m**3  # attractive self-interactions
 else:
     b_coeff = 0.0
 
@@ -426,6 +426,8 @@ def main():
     pos = np.random.uniform(0.0, 1.0, (n_s, 3))
     pos = pos * np.array([Lx, Ly, Lz])
     vel = np.random.uniform(-1.0, 1.0, (n_s, 3))
+    pos = jnp.array(pos)
+    vel = jnp.array(vel)
 
     # Construct initial simulation state
     state = {}
