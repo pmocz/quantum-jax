@@ -51,6 +51,7 @@ python quantum-jax.py --res_factor 1 --self_interaction
 # [V] = km/s
 # [M] = Msun
 # ==> [T] = kpc / (km/s) = 0.9778 Gyr
+# ==> [E] = [M] [V]^2 = Msun * (km/s)^2 = 1.9891e36 Joules
 
 
 ######################################
@@ -59,11 +60,9 @@ python quantum-jax.py --res_factor 1 --self_interaction
 # command line input:
 parser = argparse.ArgumentParser(description="Simulate the Schrodinger-Poisson system.")
 parser.add_argument("--res_factor", type=int, default=1, help="Resolution factor")
+parser.add_argument("--show", action="store_true", help="Show live plots during run")
 parser.add_argument(
-    "--show", action="store_true", help="Enable live plotting during simulation"
-)
-parser.add_argument(
-    "--self_interaction", action="store_true", help="Enable quartic self-interaction"
+    "--self_interaction", action="store_true", help="Enable self-interaction"
 )
 args = parser.parse_args()
 
@@ -104,23 +103,24 @@ frac_dm = 1.0 - frac_s  # fraction of total mass in dark matter
 G = 4.30241002e-6  # gravitational constant in kpc (km/s)^2 / Msun  |  [V^2][L]/[M]  |  (G / (km/s)^2 * (mass of sun) / kpc)
 hbar = 1.71818134e-87  # in [V][L][M] | (hbar / ((km/s) * kpc * mass of sun))
 ev_to_msun = 8.96215334e-67  # mass of electron volt in [M] | (eV/c^2/mass of sun)
+ev_to_internal = 8.05478173e-56  # eV to internal energy unites
+c = 299792.458  # speed of light in km/s
 m = m_22 * 1.0e-22 * ev_to_msun  # axion mass in [M]
 m_per_hbar = m / hbar  # (~0.052 1/([V][M]))
-m_s = M_s / n_s  # mass of each star particle
 
 h = 0.7  # little-h (dimensionless)
 H0 = 0.1 * h  # Hubble constant in (km/s)/kpc
 rho_crit = 3.0 * H0**2 / (8.0 * jnp.pi * G)  # critical density in Msun/kpc^3 (~136)
 
+m_s = M_s / n_s  # mass of each star particle
 
 # self-interaction coefficient
 if args.self_interaction:
-    f15 = 1.5  # lower to increase self-interaction strength
-    cm_to_kpc = 3.240779289e-22
-    hbarc_cm = 1.973269788e-5
-    a_s_cm = (m_22 * 1e-22) * hbarc_cm / (32.0 * jnp.pi * (f15 * 1e24) ** 2)
-    a_s_kpc = a_s_cm * cm_to_kpc
-    b_coeff = -4.0 * jnp.pi * hbar**2 * a_s_kpc / m**3  # attractive self-interactions
+    f15 = 1.5  # units of 10^15 GeV. lower to increase self-interaction strength
+    f_ev = f15 * 1.0e24
+    f_internal = f_ev * ev_to_internal
+    a_s = hbar * c**3 * m / (32.0 * jnp.pi * (f_internal**2))
+    b_coeff = -4.0 * jnp.pi * a_s / m_per_hbar**2 / hbar  # attractive self-interactions
 else:
     b_coeff = 0.0
 

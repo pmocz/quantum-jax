@@ -46,9 +46,7 @@ python quantum-fluid-turb.py --res_factor 1 --show
 # command line input:
 parser = argparse.ArgumentParser(description="Simulate the Schrodinger-Poisson system.")
 parser.add_argument("--res_factor", type=int, default=1, help="Resolution factor")
-parser.add_argument(
-    "--show", action="store_true", help="Enable live plotting during simulation"
-)
+parser.add_argument("--show", action="store_true", help="Show live plots during run")
 args = parser.parse_args()
 
 # Enable for double precision
@@ -72,7 +70,7 @@ m_22 = 1.0
 # gas
 frac_gas = 0.2  # fraction of total mass in gas
 rho_gas = frac_gas * rho_bar  # average density of gas
-c = 10.0  # sound speed (km/s)
+cs = 10.0  # sound speed (km/s)
 
 # dark matter
 frac_dm = 1.0 - frac_gas  # fraction of total mass in dark matter
@@ -85,12 +83,15 @@ sigma = 10.0  # velocity dispersion of dm
 G = 4.30241002e-6  # gravitational constant in kpc (km/s)^2 / Msun  |  [V^2][L]/[M]  |  (G / (km/s)^2 * (mass of sun) / kpc)
 hbar = 1.71818134e-87  # in [V][L][M] | (hbar / ((km/s) * kpc * mass of sun))
 ev_to_msun = 8.96215334e-67  # mass of electron volt in [M] | (eV/c^2/mass of sun)
+ev_to_internal = 8.05478173e-56  # eV to internal energy unites
+c = 299792.458  # speed of light in km/s
 m = m_22 * 1.0e-22 * ev_to_msun  # axion mass in [M]
 m_per_hbar = m / hbar  # (~0.052 1/([V][M]))
 
 h = 0.7  # little-h (dimensionless)
 H0 = 0.1 * h  # Hubble constant in (km/s)/kpc
 rho_crit = 3.0 * H0**2 / (8.0 * jnp.pi * G)  # critical density in Msun/kpc^3 (~136)
+
 
 # check that de broglie wavelength fits into box
 de_broglie_wavelength = hbar / (m * sigma)
@@ -99,7 +100,7 @@ assert n_wavelengths > 1
 
 # print some info
 print(f"# de Broglie wavelengths in box: {n_wavelengths:.2f}")
-print(f"c/sigma: {c / sigma:.2f}")
+print(f"c_s/sigma: {cs / sigma:.2f}")
 print(f"rho_gas/rho_dm: {rho_gas / (frac_dm * rho_bar):.2f}")
 
 
@@ -134,7 +135,7 @@ dt = t_end / nt
 
 
 # check we can resolve mach 2 flow
-assert dt < 2.0 * dx / c
+assert dt < 2.0 * dx / cs
 
 ##############
 # Checkpointer
@@ -152,7 +153,7 @@ params["nx"] = nx
 params["m_22"] = m_22
 params["rho_bar"] = rho_bar
 params["sigma"] = sigma
-params["c"] = c
+params["cs"] = cs
 params["t_end"] = t_end
 params["frac_gas"] = frac_gas
 params["frac_dm"] = frac_dm
@@ -236,7 +237,7 @@ def get_flux(rho_L, vx_L, vy_L, vz_L, rho_R, vx_R, vy_R, vz_R):
     momy_star = 0.5 * (rho_L * vy_L + rho_R * vy_R)
     momz_star = 0.5 * (rho_L * vz_L + rho_R * vz_R)
 
-    P_star = rho_star * c * c
+    P_star = rho_star * cs * cs
 
     # compute fluxes (local Lax-Friedrichs/Rusanov)
     flux_Mass = momx_star
@@ -245,8 +246,8 @@ def get_flux(rho_L, vx_L, vy_L, vz_L, rho_R, vx_R, vy_R, vz_R):
     flux_Momz = momx_star * momz_star / rho_star
 
     # find wavespeeds
-    C_L = c + jnp.abs(vx_L)
-    C_R = c + jnp.abs(vx_R)
+    C_L = cs + jnp.abs(vx_L)
+    C_R = cs + jnp.abs(vx_R)
     C = jnp.maximum(C_L, C_R)
 
     # add stabilizing diffusive term
@@ -289,13 +290,13 @@ def solve_hydro(rho, vx, vy, vz, dt):
         + rho * vz_dz
     )
     vx_prime = vx - 0.5 * dt * (
-        vx * vx_dx + vy * vx_dy + vz * vx_dz + (1.0 / rho) * rho_dx * c * c
+        vx * vx_dx + vy * vx_dy + vz * vx_dz + (1.0 / rho) * rho_dx * cs * cs
     )
     vy_prime = vy - 0.5 * dt * (
-        vx * vy_dx + vy * vy_dy + vz * vy_dz + (1.0 / rho) * rho_dy * c * c
+        vx * vy_dx + vy * vy_dy + vz * vy_dz + (1.0 / rho) * rho_dy * cs * cs
     )
     vz_prime = vz - 0.5 * dt * (
-        vx * vz_dx + vy * vz_dy + vz * vz_dz + (1.0 / rho) * rho_dz * c * c
+        vx * vz_dx + vy * vz_dy + vz * vz_dz + (1.0 / rho) * rho_dz * cs * cs
     )
 
     # extrapolate in space to face centers
