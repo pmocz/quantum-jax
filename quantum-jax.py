@@ -9,7 +9,7 @@ import argparse
 import json
 
 """
-A minimal differentiable Schrodinger-Poisson solver written in JAX
+A simple Schrodinger-Poisson solver written in JAX
 to simulate fuzzy dark matter.
 
 Philip Mocz (2025), @pmocz
@@ -23,7 +23,10 @@ Monthly Notices of the Royal Astronomical Society, 471(4), 4559-4570
 https://doi.org/10.1093/mnras/stx1887
 https://arxiv.org/abs/1705.05845
 
-Plus collisionless star particles (coupled gravitationally).
+Optional:
+
+* self-interactions
+* collisionless star particles (coupled gravitationally)
 
 Example Usage:
 
@@ -32,10 +35,14 @@ python quantum-jax.py --res_factor 1 --live_plot
 
 """
 
+
 # TODO: add distributed support
 # TODO: remove redundant calculations
-# TODO: timestep also includes acceleration
+# TODO: timestep limit also includes acceleration
 # TODO: improve UI
+# TODO: add cosmology
+# TODO: add isothermal fluid equation (coupled gravitationally)
+
 
 #############
 # Unit System
@@ -71,7 +78,7 @@ Lx = 128.0
 Ly = 64.0
 Lz = 16.0
 
-# average density (in units of Msun / kpc^3)
+# average density of all matter (dm+stars+gas) in the simulation (in units of Msun / kpc^3)
 rho_bar = 10000.0
 
 # stop time (in units of kpc / (km/s) = 0.9778 Gyr)
@@ -81,8 +88,12 @@ t_end = 10.0
 m_22 = 1.0
 
 # stars
-M_s = 0.1 * rho_bar * Lx * Ly * Lz  # total mass of stars, in units of Msun
+frac_s = 0.1  # fraction of total mass in stars
+M_s = frac_s * rho_bar * Lx * Ly * Lz  # total mass of stars, in units of Msun
 n_s = 600 * args.res_factor  # number of star particles
+
+# dark matter
+frac_dm = 1.0 - frac_s  # fraction of total mass in dark matter
 
 
 ##################
@@ -255,11 +266,11 @@ def compute_step(psi, pos, vel, t, a_max, dt_s):
     """Compute the next step in the simulation."""
     # (1/2) kick
     rho_s = bin_stars(pos)
-    rho = jnp.abs(psi) ** 2 + rho_s
-    V = get_potential(rho)
+    rho_tot = jnp.abs(psi) ** 2 + rho_s
+    V = get_potential(rho_tot)
     psi = jnp.exp(-1.0j * m_per_hbar * dt / 2.0 * V) * psi
 
-    acc, a_max1 = get_acceleration(pos, rho)
+    acc, a_max1 = get_acceleration(pos, rho_tot)
     vel = vel + acc * dt / 2.0
 
     # drift
@@ -272,11 +283,11 @@ def compute_step(psi, pos, vel, t, a_max, dt_s):
 
     # (1/2) kick
     rho_s = bin_stars(pos)
-    rho = jnp.abs(psi) ** 2 + rho_s
-    V = get_potential(rho)
+    rho_tot = jnp.abs(psi) ** 2 + rho_s
+    V = get_potential(rho_tot)
     psi = jnp.exp(-1.0j * m_per_hbar * dt / 2.0 * V) * psi
 
-    acc, a_max2 = get_acceleration(pos, rho)
+    acc, a_max2 = get_acceleration(pos, rho_tot)
     vel = vel + acc * dt / 2.0
 
     # update time
@@ -326,6 +337,7 @@ def plot_sim(ax, state):
 
 def main():
     """Main physics simulation."""
+
     # Initial Condition
     t = 0.0
     amp = 100.0
@@ -373,8 +385,8 @@ def main():
         * jnp.exp(-((X - 0.5 * Lx) ** 2 + (Y - 0.4 * Ly) ** 2) / 2.0 / sigma**2)
         / (sigma**3 * jnp.sqrt(2.0 * jnp.pi) ** 2)
     )
-    # normalize wavefunction to <|psi|^2>=rho_bar
-    rho *= rho_bar / jnp.mean(rho)
+    # normalize wavefunction to <|psi|^2>=frac_dm*rho_bar
+    rho *= frac_dm * rho_bar / jnp.mean(rho)
     psi = jnp.sqrt(rho) + 0.0j
 
     # stars have random positions and velocities
@@ -402,13 +414,7 @@ def main():
     for i in range(100):
         print(f"step {i}")
         state = jax.lax.fori_loop(0, nt_sub, update, init_val=state)
-        async_checkpoint_manager.save(
-            i,
-            # args=ocp.args.Composite(
-            #    state=ocp.args.StandardSave(state), params=ocp.args.JsonSave(params)
-            # ),
-            args=ocp.args.StandardSave(state),
-        )
+        async_checkpoint_manager.save(i, args=ocp.args.StandardSave(state))
         # timestep check (acceleration criterion)
         assert dt < 2.0 * jnp.pi / m_per_hbar / dx / state["a_max"]
         assert dt < state["dt_s"]
@@ -423,7 +429,7 @@ def main():
 
     # Plot final state
     plot_sim(ax, state)
-    plt.savefig("checkpoint_dir" + "/quantum.png", dpi=240)
+    plt.savefig(checkpoint_dir + "/quantum.png", dpi=240)
     if args.live_plot:
         plt.show()
 
