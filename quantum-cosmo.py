@@ -256,7 +256,7 @@ def main():
     state["psi"] = psi
 
     # Simulation Main Loop
-    fig = plt.figure(figsize=(6, 4), dpi=80)
+    plt.figure(figsize=(6, 4), dpi=80)
     print("Starting simulation ...")
     with open(checkpoint_dir + "/params.json", "w") as f:
         json.dump(params, f, indent=2)
