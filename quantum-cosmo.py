@@ -212,7 +212,7 @@ def update(_, state):
 def plot_sim(state):
     """Plot the simulation state."""
     # DM projection
-    rho_proj_dm = jnp.log10(jnp.mean(jnp.abs(state["psi"]) ** 2, axis=3))
+    rho_proj_dm = jnp.log10(jnp.mean(jnp.abs(state["psi"]) ** 2, axis=2))
     vmin = 1.7
     vmax = 3.7
     plt.imshow(
