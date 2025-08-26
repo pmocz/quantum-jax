@@ -26,8 +26,8 @@ https://arxiv.org/abs/1705.05845
 
 Example Usage:
 
-python quantum-fluid-turb.py --res_factor 1
-python quantum-fluid-turb.py --res_factor 1 --show
+python quantum-fluid.py --res_factor 1
+python quantum-fluid.py --res_factor 1 --show
 
 """
 

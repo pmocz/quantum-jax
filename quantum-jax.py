@@ -79,7 +79,7 @@ Lx = 128.0
 Ly = 64.0
 Lz = 16.0
 
-# average density of all matter (dm+stars+gas) in the simulation (in units of Msun / kpc^3)
+# average density of all matter (dm+stars) in the simulation (in units of Msun / kpc^3)
 rho_bar = 10000.0
 
 # stop time (in units of kpc / (km/s) = 0.9778 Gyr)
