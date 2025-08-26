@@ -239,7 +239,7 @@ def main():
 
     # dark matter
     # read in hdf5 file (which is in units of 1e10 Msun/kpc^2)
-    with h5py.File("data/fdm_1mpc_256_m1e-21_z127_ic.hdf5", "r") as f:
+    with h5py.File("data/fdm_1mpc_256_m2.5e-22_z127_ic.hdf5", "r") as f:
         psi = jnp.array(f["psiRe"]) + 1.0j * jnp.array(f["psiIm"])
         psi *= 1e5
 
