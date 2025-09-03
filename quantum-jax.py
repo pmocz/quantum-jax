@@ -448,6 +448,7 @@ def main():
     for i in range(100):
         print(f"step {i}")
         state = jax.lax.fori_loop(0, nt_sub, update, init_val=state)
+        jax.block_until_ready(state)
         async_checkpoint_manager.save(i, args=ocp.args.StandardSave(state))
         # a posteriori timestep check (acceleration criterion)
         assert dt < 2.0 * jnp.pi / m_per_hbar / dx / state["a_max"]

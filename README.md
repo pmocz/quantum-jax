@@ -62,7 +62,7 @@ pip install -r requirements.txt
 Submit a job:
 
 ```console
-sbatch quantum-jax.py
+sbatch sbatch_rusty.sh
 ```
 
 ## Plot checkpoints
