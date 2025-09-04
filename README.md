@@ -50,7 +50,7 @@ Make a virtual environment (make sure your `~/.bashrc` file contains `export VEN
 
 ```console
 module purge
-module load python/3.11
+module load python/3.13
 python -m venv --system-site-packages $VENVDIR/quantum-jax-venv
 source $VENVDIR/quantum-jax-venv/bin/activate
 pip install --upgrade pip
