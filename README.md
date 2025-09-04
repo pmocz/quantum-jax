@@ -46,18 +46,11 @@ Go into the folder:
 cd quantum-jax
 ```
 
-Make a virtual environment (make sure your `~/.bashrc` file contains `export VENVDIR=/mnt/home/USER_NAME/FOLDER_TO_YOUR_ENVIRONMENTS`) -- this is a one-time setup:
+Make a virtual environment (first make sure your `~/.bashrc` file contains `export VENVDIR=/mnt/home/USER_NAME/FOLDER_TO_YOUR_ENVIRONMENTS`) -- this is a one-time setup:
 
 ```console
-module purge
-module load python/3.13
-python -m venv --system-site-packages $VENVDIR/quantum-jax-venv
-source $VENVDIR/quantum-jax-venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
+./venv_setup.sh
 ```
-
-(or just run the setup script: `.venv_setup.sh`)
 
 Submit a job:
 
