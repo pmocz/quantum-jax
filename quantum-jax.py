@@ -441,7 +441,7 @@ def main():
     # Simulation Main Loop
     fig = plt.figure(figsize=(6, 4), dpi=80)
     ax = fig.add_subplot(111)
-    print("Starting simulation ...")
+    print(f"Starting simulation with res_factor={args.res_factor} ...")
     with open(checkpoint_dir + "/params.json", "w") as f:
         json.dump(params, f, indent=2)
     t_start_timer = time.time()
@@ -461,6 +461,8 @@ def main():
         async_checkpoint_manager.wait_until_finished()
     jax.block_until_ready(state)
     print("Simulation Run Time (s): ", time.time() - t_start_timer)
+
+    async_checkpoint_manager.close()
 
     # Plot final state
     plot_sim(ax, state)

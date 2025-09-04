@@ -9,13 +9,13 @@
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=80G
-#SBATCH --time=00-00:15
+#SBATCH --time=00-00:10
 
 module purge
-module load python/3.13
+module load python/3.11
 
 export PYTHONUNBUFFERED=TRUE
 
 source $VENVDIR/quantum-jax-venv/bin/activate
 
-srun python quantum-jax.py --res_factor=8
+srun python quantum-jax.py --res_factor=2
