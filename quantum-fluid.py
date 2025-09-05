@@ -140,8 +140,8 @@ assert dt < 2.0 * dx / cs
 ##############
 # Checkpointer
 options = ocp.CheckpointManagerOptions()
-checkpoint_dir = f"checkpoints_fluid{args.res_factor}"
-path = ocp.test_utils.erase_and_create_empty(os.getcwd() + "/" + checkpoint_dir)
+checkpoint_dir = os.path.join(os.getcwd(), f"checkpoints_fluid{args.res_factor}")
+path = ocp.test_utils.erase_and_create_empty(checkpoint_dir)
 async_checkpoint_manager = ocp.CheckpointManager(path, options=options)
 
 
@@ -466,7 +466,7 @@ def main():
     # Simulation Main Loop
     fig, axs = plt.subplots(1, 2, figsize=(12, 4), dpi=80)
     print("Starting simulation ...")
-    with open(checkpoint_dir + "/params.json", "w") as f:
+    with open(os.path.join(checkpoint_dir, "params.json"), "w") as f:
         json.dump(params, f, indent=2)
     t_start_timer = time.time()
     for i in range(100):
@@ -482,7 +482,7 @@ def main():
 
     # Plot final state
     plot_sim(axs, state)
-    plt.savefig(checkpoint_dir + "/final.png", dpi=240)
+    plt.savefig(os.path.join(checkpoint_dir, "final.png"), dpi=240)
     if args.show:
         plt.show()
 

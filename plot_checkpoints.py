@@ -48,7 +48,8 @@ def main():
             with open(params_path, "r") as f:
                 params = json.load(f)
             # Load the checkpoint
-            restored = async_checkpoint_manager.restore(i * grid_j + j)
+            i_checkpoint = i * grid_j + j
+            restored = async_checkpoint_manager.restore(i_checkpoint)
             rho = np.mean(np.abs(restored["psi"]) ** 2, axis=2).T
             if row_rho.size == 0:
                 row_rho = rho

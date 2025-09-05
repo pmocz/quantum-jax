@@ -160,8 +160,8 @@ dt = t_end / nt
 ##############
 # Checkpointer
 options = ocp.CheckpointManagerOptions()
-checkpoint_dir = f"checkpoints{args.res_factor}"
-path = ocp.test_utils.erase_and_create_empty(os.getcwd() + "/" + checkpoint_dir)
+checkpoint_dir = os.path.join(os.getcwd(), f"checkpoints{args.res_factor}")
+path = ocp.test_utils.erase_and_create_empty(checkpoint_dir)
 async_checkpoint_manager = ocp.CheckpointManager(path, options=options)
 
 
@@ -442,7 +442,7 @@ def main():
     fig = plt.figure(figsize=(6, 4), dpi=80)
     ax = fig.add_subplot(111)
     print(f"Starting simulation with res_factor={args.res_factor} ...")
-    with open(checkpoint_dir + "/params.json", "w") as f:
+    with open(os.path.join(checkpoint_dir, "params.json"), "w") as f:
         json.dump(params, f, indent=2)
     t_start_timer = time.time()
     for i in range(100):
@@ -466,7 +466,7 @@ def main():
 
     # Plot final state
     plot_sim(ax, state)
-    plt.savefig(checkpoint_dir + "/final.png", dpi=240)
+    plt.savefig(os.path.join(checkpoint_dir, "final.png"), dpi=240)
     if args.show:
         plt.show()
 

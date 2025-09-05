@@ -6,6 +6,11 @@ Authors: [Philip Mocz (@pmocz)](https://github.com/pmocz/), [Eric Ludwig (@TheRe
 
 A simple differentiable Schrodinger-Poisson solver written in JAX
 
+* `quantum-jax.py` includes star particles and self-interaction
+* `quantum-fluid.py` includes isothermal gas
+* `quantum-cosmo.py` includes cosmological comoving coordinates
+
+
 ## How to Run (Locally)
 
 Check out the code: 
