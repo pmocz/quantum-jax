@@ -267,7 +267,7 @@ def main():
         state = jax.lax.fori_loop(0, nt_sub, update, init_val=state)
         async_checkpoint_manager.save(i, args=ocp.args.StandardSave(state))
         plot_sim(state)
-        plt.savefig(checkpoint_dir + "/snap{:03d}.png".format(i))
+        plt.savefig(os.path.join(checkpoint_dir, f"snap{i:03d}.png"))
         plt.clf()
         async_checkpoint_manager.wait_until_finished()
     jax.block_until_ready(state)

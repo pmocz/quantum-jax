@@ -27,7 +27,6 @@ https://arxiv.org/abs/1705.05845
 Example Usage:
 
 python quantum-fluid.py --res_factor 1
-python quantum-fluid.py --res_factor 1 --show
 
 """
 
@@ -395,8 +394,10 @@ def update(_, state):
     return state
 
 
-def plot_sim(axs, state):
+def plot_sim(state):
     """Plot the simulation state."""
+    fig, axs = plt.subplots(1, 2, figsize=(12, 4), dpi=80)
+
     # DM projection
     rho_proj_dm = jnp.log10(jnp.mean(jnp.abs(state["psi"]) ** 2, axis=2))
     vmin = jnp.log10(rho_bar * frac_dm * 0.5)
@@ -432,8 +433,6 @@ def plot_sim(axs, state):
     axs[1].get_yaxis().set_visible(False)
 
     plt.tight_layout()
-    if args.show:
-        plt.pause(0.001)
 
 
 def main():
@@ -469,7 +468,6 @@ def main():
     state["vz"] = vz
 
     # Simulation Main Loop
-    fig, axs = plt.subplots(1, 2, figsize=(12, 4), dpi=80)
     print("Starting simulation ...")
     with open(os.path.join(checkpoint_dir, "params.json"), "w") as f:
         json.dump(params, f, indent=2)
@@ -478,18 +476,15 @@ def main():
         print(f"step {i}")
         state = jax.lax.fori_loop(0, nt_sub, update, init_val=state)
         async_checkpoint_manager.save(i, args=ocp.args.StandardSave(state))
-        # live plot of the simulation
-        if args.show:
-            plot_sim(axs, state)
+        plot_sim(state)
+        plt.savefig(os.path.join(checkpoint_dir, f"snap{i:03d}.png"))
         async_checkpoint_manager.wait_until_finished()
     jax.block_until_ready(state)
     print("Simulation Run Time (s): ", time.time() - t_start_timer)
 
     # Plot final state
-    plot_sim(axs, state)
+    plot_sim(state)
     plt.savefig(os.path.join(checkpoint_dir, "final.png"), dpi=240)
-    if args.show:
-        plt.show()
 
 
 if __name__ == "__main__":
