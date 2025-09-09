@@ -8,6 +8,7 @@ A simple differentiable Schrodinger-Poisson solver written in JAX
 
 * `quantum-jax.py` includes star particles and self-interaction
 * `quantum-fluid.py` includes isothermal gas
+* `quantum-bh.py` includes a black hole sink particle
 * `quantum-cosmo.py` includes cosmological comoving coordinates
 
 
