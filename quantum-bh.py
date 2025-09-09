@@ -388,7 +388,7 @@ def main():
     state = {}
     state["t"] = t
     state["psi"] = psi
-    state["m_bh"] = M_bh
+    state["m_bh"] = m_bh
     state["pos"] = pos
     state["vel"] = vel
 
