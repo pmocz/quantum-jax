@@ -160,7 +160,7 @@ dt = t_end / nt
 ##############
 # Checkpointer
 options = ocp.CheckpointManagerOptions()
-checkpoint_dir = os.path.join(os.getcwd(), f"checkpoints{args.res_factor}")
+checkpoint_dir = os.path.join(os.getcwd(), f"checkpoints_stars{args.res_factor}")
 path = ocp.test_utils.erase_and_create_empty(checkpoint_dir)
 async_checkpoint_manager = ocp.CheckpointManager(path, options=options)
 
