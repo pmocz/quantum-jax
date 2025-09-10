@@ -63,7 +63,7 @@ args = parser.parse_args()
 nx = 32 * args.res_factor
 
 # box dimensions (in units of kpc)
-Lx = 8.0
+Lx = 10.0
 
 # average density of dark matter in the simulation (in units of Msun / kpc^3)
 rho_bar = 10000.0
@@ -103,8 +103,9 @@ de_broglie_wavelength = hbar / (m * sigma)
 n_wavelengths = Lx / de_broglie_wavelength
 assert n_wavelengths > 1
 
-# check the Schwarzschild radius, jeans length
+# check the Schwarzschild radius, bondi radius, jeans length
 r_s = 2.0 * G * M_bh / c**2  # in kpc
+r_bondi_est = G * M_bh / (sigma**2)
 jeans_length = sigma * jnp.sqrt(1.0 / (G * rho_bar))
 n_jeans = Lx / jeans_length
 r_bondi_est = G * M_bh / (sigma**2)
@@ -120,7 +121,7 @@ print(f"M_bh/M_dm: {M_bh / (Lx * Lx * Lx * rho_bar):.2f}")
 ######
 # Mesh
 
-# Domain [0,Lx] x [0,Ly] x [0,Lz]
+# Domain [0,Lx] x [0,Lx] x [0,Lx]
 dx = Lx / nx
 vol = dx * dx * dx  # volume of each cell
 x_lin = jnp.linspace(0.5 * dx, Lx - 0.5 * dx, nx)
@@ -204,7 +205,7 @@ def bin_particles(pos, m_bh):
 
     def deposit_particle(s, rho):
         """Deposit the particle mass into the grid."""
-        fac = m_bh / (dx * dx * dx)
+        fac = m_bh[s] / vol
         rho = rho.at[i[s, 0], i[s, 1], i[s, 2]].add(
             w_i[s, 0] * w_i[s, 1] * w_i[s, 2] * fac
         )
@@ -236,7 +237,7 @@ def bin_particles(pos, m_bh):
 
 
 def get_acceleration(pos, rho):
-    """Compute the acceleration of the stars."""
+    """Compute the acceleration of the particles."""
     i, ip1, w_i, w_ip1 = get_cic_indices_and_weights(pos)
 
     # find accelerations on the grid
@@ -247,7 +248,7 @@ def get_acceleration(pos, rho):
     a_grid = jnp.stack((ax, ay, az), axis=-1)
     # a_max = jnp.max(jnp.abs(a_grid))
 
-    # interpolate the accelerations to the star positions
+    # interpolate the accelerations to the particle positions
     acc = jnp.zeros((n_bh, 3))
     acc += (w_i[:, 0] * w_i[:, 1] * w_i[:, 2])[:, None] * a_grid[
         i[:, 0], i[:, 1], i[:, 2]
@@ -274,6 +275,37 @@ def get_acceleration(pos, rho):
         ip1[:, 0], ip1[:, 1], ip1[:, 2]
     ]
     return acc
+
+
+###########
+# Accretion
+
+
+def do_accretion(psi, pos, vel, m_bh):
+    """Accrete dark matter onto black hole."""
+
+    # find the cell the BH is in
+    dxs = jnp.array([dx, dx, dx])
+    i = jnp.floor((pos - 0.5 * dxs) / dxs)
+    i = jnp.mod(i, jnp.array([nx, nx, nx])).astype(int)
+    s = 0
+
+    psi_at_bh = psi[i[s, 0], i[s, 1], i[s, 2]]
+    psi_amp = jnp.abs(psi_at_bh)
+    psi_theta = jnp.angle(psi_at_bh)
+
+    # XXX TODO: implement me
+    dM_dt = 0.0
+
+    # transfer mass from dm to BH
+    new_psi_amp = jnp.abs(psi_amp) - jnp.sqrt(dM_dt * dt / vol)
+    new_psi = new_psi_amp * jnp.exp(1.0j * psi_theta)
+
+    psi = psi.at[i[s, 0], i[s, 1], i[s, 2]].set(new_psi)
+
+    m_bh += dM_dt * dt
+
+    return psi, m_bh
 
 
 #######################
@@ -306,10 +338,11 @@ def compute_step(psi, m_bh, pos, vel, t):
     V = get_potential(rho_tot)
     psi = jnp.exp(-1.0j * m_per_hbar * dt / 2.0 * V) * psi
 
-    # XXX TODO: add black hole accretion here
-
     acc = get_acceleration(pos, rho_tot)
     vel = vel + acc * dt / 2.0
+
+    # accretion
+    psi, m_bh = do_accretion(psi, pos, vel, m_bh)
 
     # update time
     t += dt
@@ -401,6 +434,7 @@ def main():
         print(f"step {i}")
         state = jax.lax.fori_loop(0, nt_sub, update, init_val=state)
         async_checkpoint_manager.save(i, args=ocp.args.StandardSave(state))
+        print(f"   m_bh={state['m_bh'][0]:0.2e}")
         plot_sim(state)
         plt.savefig(os.path.join(checkpoint_dir, f"snap{i:03d}.png"))
         if args.show:
