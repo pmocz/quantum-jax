@@ -30,9 +30,9 @@ Optional:
 
 Example Usage:
 
-python quantum-stars.py --res_factor 1
-python quantum-stars.py --res_factor 1 --show
-python quantum-stars.py --res_factor 1 --self_interaction
+python quantum-stars.py --res 1
+python quantum-stars.py --res 1 --show
+python quantum-stars.py --res 1 --self_interaction
 
 """
 
@@ -59,7 +59,7 @@ python quantum-stars.py --res_factor 1 --self_interaction
 
 # command line input:
 parser = argparse.ArgumentParser(description="Simulate the Schrodinger-Poisson system.")
-parser.add_argument("--res_factor", type=int, default=1, help="Resolution factor")
+parser.add_argument("--res", type=int, default=1, help="Resolution factor")
 parser.add_argument("--show", action="store_true", help="Show live plots during run")
 parser.add_argument(
     "--self_interaction", action="store_true", help="Enable self-interaction"
@@ -70,9 +70,9 @@ args = parser.parse_args()
 # jax.config.update("jax_enable_x64", True)
 
 # resolution
-nx = 128 * args.res_factor
-ny = 64 * args.res_factor
-nz = 16 * args.res_factor
+nx = 128 * args.res
+ny = 64 * args.res
+nz = 16 * args.res
 
 # box dimensions (in units of kpc)
 Lx = 128.0
@@ -91,7 +91,7 @@ m_22 = 1.0
 # stars
 frac_s = 0.1  # fraction of total mass in stars
 M_s = frac_s * rho_bar * Lx * Ly * Lz  # total mass of stars, in units of Msun
-n_s = 400 * args.res_factor  # number of star particles
+n_s = 400 * args.res  # number of star particles
 
 # dark matter
 frac_dm = 1.0 - frac_s  # fraction of total mass in dark matter
@@ -160,7 +160,7 @@ dt = t_end / nt
 ##############
 # Checkpointer
 options = ocp.CheckpointManagerOptions()
-checkpoint_dir = os.path.join(os.getcwd(), f"checkpoints_stars{args.res_factor}")
+checkpoint_dir = os.path.join(os.getcwd(), f"checkpoints_stars{args.res}")
 path = ocp.test_utils.erase_and_create_empty(checkpoint_dir)
 async_checkpoint_manager = ocp.CheckpointManager(path, options=options)
 
@@ -351,7 +351,7 @@ def update(_, state):
     return state
 
 
-def plot_sim(ax, state):
+def plot_sim(state):
     """Plot the simulation state."""
     rho_proj = jnp.log10(jnp.mean(jnp.abs(state["psi"]) ** 2, axis=2)).T
     plt.imshow(rho_proj, cmap="inferno", origin="lower", extent=(0, nx, 0, ny))
@@ -360,6 +360,7 @@ def plot_sim(ax, state):
     plt.plot(sx, sy, color="cyan", marker=".", linestyle="None", markersize=1)
     plt.colorbar(label="log10(|psi|^2)")
     plt.tight_layout()
+    ax = plt.gca()
     ax.set_aspect("equal")
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
@@ -438,10 +439,13 @@ def main():
     state["a_max"] = 0.0
     state["dt_s"] = dt
 
+    # Plot the initial state
+    plot_sim(state)
+    plt.savefig(os.path.join(checkpoint_dir, "initial.png"), dpi=240)
+    plt.clf()
+
     # Simulation Main Loop
-    fig = plt.figure(figsize=(6, 4), dpi=80)
-    ax = fig.add_subplot(111)
-    print(f"Starting simulation with res_factor={args.res_factor} ...")
+    print(f"Starting simulation with res={args.res} ...")
     with open(os.path.join(checkpoint_dir, "params.json"), "w") as f:
         json.dump(params, f, indent=2)
     t_start_timer = time.time()
@@ -453,11 +457,11 @@ def main():
         # a posteriori timestep check (acceleration criterion)
         assert dt < 2.0 * jnp.pi / m_per_hbar / dx / state["a_max"]
         assert dt < state["dt_s"]
-        # live plot of the simulation
+        plot_sim(state)
+        plt.savefig(os.path.join(checkpoint_dir, f"snap{i:03d}.png"))
         if args.show:
-            plot_sim(ax, state)
-            plt.pause(0.001)
-            plt.clf()
+            plt.pause(0.01)
+        plt.clf()
         async_checkpoint_manager.wait_until_finished()
     jax.block_until_ready(state)
     print("Simulation Run Time (s): ", time.time() - t_start_timer)
@@ -465,10 +469,8 @@ def main():
     async_checkpoint_manager.close()
 
     # Plot final state
-    plot_sim(ax, state)
+    plot_sim(state)
     plt.savefig(os.path.join(checkpoint_dir, "final.png"), dpi=240)
-    if args.show:
-        plt.show()
 
 
 if __name__ == "__main__":

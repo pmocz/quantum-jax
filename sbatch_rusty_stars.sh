@@ -18,4 +18,4 @@ export PYTHONUNBUFFERED=TRUE
 
 source $VENVDIR/quantum-jax-venv/bin/activate
 
-srun python quantum-stars.py --res_factor=2
+srun python quantum-stars.py --res=2

@@ -61,7 +61,7 @@ Make a virtual environment (first make sure your `~/.bashrc` file contains `expo
 Submit a job:
 
 ```console
-sbatch sbatch_rusty.sh
+sbatch sbatch_rusty_stars.sh
 ```
 
 ## Plot checkpoints

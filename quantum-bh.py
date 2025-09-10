@@ -34,7 +34,7 @@ https://arxiv.org/pdf/1908.04790
 
 Example Usage:
 
-python quantum-bh.py --res_factor 1
+python quantum-bh.py --res 1
 
 """
 
@@ -52,7 +52,7 @@ python quantum-bh.py --res_factor 1
 
 # command line input:
 parser = argparse.ArgumentParser(description="Simulate the Schrodinger-Poisson system.")
-parser.add_argument("--res_factor", type=int, default=1, help="Resolution factor")
+parser.add_argument("--res", type=int, default=1, help="Resolution factor")
 parser.add_argument("--show", action="store_true", help="Show live plots during run")
 parser.add_argument(
     "--soliton", action="store_true", help="Run with soliton initial conditions"
@@ -63,7 +63,7 @@ args = parser.parse_args()
 # jax.config.update("jax_enable_x64", True)
 
 # resolution
-nx = 32 * args.res_factor
+nx = 32 * args.res
 
 # box dimensions (in units of kpc)
 Lx = 1.0
@@ -174,7 +174,7 @@ assert r_bondi_est < 0.5 * Lx, f"{r_bondi_est} {Lx}"
 ##############
 # Checkpointer
 options = ocp.CheckpointManagerOptions()
-checkpoint_dir = os.path.join(os.getcwd(), f"checkpoints_bh{args.res_factor}")
+checkpoint_dir = os.path.join(os.getcwd(), f"checkpoints_bh{args.res}")
 path = ocp.test_utils.erase_and_create_empty(checkpoint_dir)
 async_checkpoint_manager = ocp.CheckpointManager(path, options=options)
 
@@ -474,6 +474,11 @@ def main():
     state["pos"] = pos
     state["vel"] = vel
 
+    # Plot the initial state
+    plot_sim(state)
+    plt.savefig(os.path.join(checkpoint_dir, "initial.png"), dpi=240)
+    plt.clf()
+
     # Simulation Main Loop
     print("Starting simulation ...")
     with open(os.path.join(checkpoint_dir, "params.json"), "w") as f:
@@ -487,7 +492,7 @@ def main():
         plot_sim(state)
         plt.savefig(os.path.join(checkpoint_dir, f"snap{i:03d}.png"))
         if args.show:
-            plt.pause(0.1)
+            plt.pause(0.01)
         plt.clf()
         async_checkpoint_manager.wait_until_finished()
     jax.block_until_ready(state)

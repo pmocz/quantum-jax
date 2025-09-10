@@ -26,7 +26,7 @@ https://arxiv.org/abs/1705.05845
 
 Example Usage:
 
-python quantum-cosmo.py --res_factor 1
+python quantum-cosmo.py --res 1
 
 """
 
@@ -44,14 +44,14 @@ python quantum-cosmo.py --res_factor 1
 
 # command line input:
 parser = argparse.ArgumentParser(description="Simulate the Schrodinger-Poisson system.")
-parser.add_argument("--res_factor", type=int, default=1, help="Resolution factor")
+parser.add_argument("--res", type=int, default=1, help="Resolution factor")
 args = parser.parse_args()
 
 # Enable for double precision
 # jax.config.update("jax_enable_x64", True)
 
 # resolution
-nx = 256 * args.res_factor
+nx = 256 * args.res
 
 # box dimensions (in units of h^-1 kpc)
 Lx = 1000.0
@@ -119,7 +119,7 @@ da = (a_end - a_start) / nt
 ##############
 # Checkpointer
 options = ocp.CheckpointManagerOptions()
-checkpoint_dir = os.path.join(os.getcwd(), f"checkpoints_cosmo{args.res_factor}")
+checkpoint_dir = os.path.join(os.getcwd(), f"checkpoints_cosmo{args.res}")
 path = ocp.test_utils.erase_and_create_empty(checkpoint_dir)
 async_checkpoint_manager = ocp.CheckpointManager(path, options=options)
 
@@ -255,8 +255,12 @@ def main():
     state["a"] = a
     state["psi"] = psi
 
+    # Plot the initial state
+    plot_sim(state)
+    plt.savefig(os.path.join(checkpoint_dir, "initial.png"), dpi=240)
+    plt.clf()
+
     # Simulation Main Loop
-    plt.figure(figsize=(6, 4), dpi=80)
     print("Starting simulation ...")
     with open(os.path.join(checkpoint_dir, "params.json"), "w") as f:
         json.dump(params, f, indent=2)
