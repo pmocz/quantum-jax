@@ -55,7 +55,7 @@ args = parser.parse_args()
 nx = 32 * args.res_factor
 
 # box dimensions (in units of kpc)
-Lx = 8.0
+Lx = 20.0
 
 # average density of all matter (dm+gas) in the simulation (in units of Msun / kpc^3)
 rho_bar = 10000.0
@@ -69,11 +69,11 @@ m_22 = 1.0
 # gas
 frac_gas = 0.2  # fraction of total mass in gas
 rho_gas = frac_gas * rho_bar  # average density of gas
-cs = 1.0  # sound speed (km/s)
+cs = 20.0  # sound speed (km/s)
 
 # dark matter
 frac_dm = 1.0 - frac_gas  # fraction of total mass in dark matter
-sigma = 10.0  # velocity dispersion of dm
+sigma = 200.0  # velocity dispersion of dm
 
 
 ##################
@@ -82,7 +82,7 @@ sigma = 10.0  # velocity dispersion of dm
 G = 2.46509932e-4  # gravitational constant in kpc (km/s)^2 / Msun  |  [V^2][L]/[M]  |  (G / (km/s)^2 * (mass of sun) / kpc)
 hbar = 9.8444538e-86  # in [V][L][M] | (hbar / ((km/s) * kpc * mass of sun))
 ev_to_msun = 8.96215334e-67  # mass of electron volt in [M] | (eV/c^2/mass of sun)
-ev_to_internal = 8.05478173e-56  # eV to internal energy units (eV / (mass of sun * (km/s)^2))
+ev_to_internal = 8.05478173e-56  # eV to internal units (eV / (mass of sun * (km/s)^2))
 c = 299792.458  # speed of light in km/s
 m = m_22 * 1.0e-22 * ev_to_msun  # axion mass in [M]
 m_per_hbar = m / hbar  # (~0.052 1/([V][M]))
@@ -100,6 +100,7 @@ assert n_wavelengths > 1
 # check the Jeans length
 jeans_length = cs * jnp.sqrt(jnp.pi / (G * rho_gas))
 n_jeans = Lx / jeans_length
+assert n_jeans < 1
 
 # print some info
 print(f"# de Broglie wavelengths in box: {n_wavelengths:.2f}")
