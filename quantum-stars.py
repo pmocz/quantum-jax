@@ -30,9 +30,9 @@ Optional:
 
 Example Usage:
 
-python quantum-jax.py --res_factor 1
-python quantum-jax.py --res_factor 1 --show
-python quantum-jax.py --res_factor 1 --self_interaction
+python quantum-stars.py --res_factor 1
+python quantum-stars.py --res_factor 1 --show
+python quantum-stars.py --res_factor 1 --self_interaction
 
 """
 

@@ -6,7 +6,7 @@ Authors: [Philip Mocz (@pmocz)](https://github.com/pmocz/), [Eric Ludwig (@TheRe
 
 A simple differentiable Schrodinger-Poisson solver written in JAX
 
-* `quantum-jax.py` includes star particles and self-interaction
+* `quantum-stars.py` includes star particles and self-interaction
 * `quantum-fluid.py` includes isothermal gas
 * `quantum-bh.py` includes a black hole sink particle
 * `quantum-cosmo.py` includes cosmological comoving coordinates
@@ -35,7 +35,7 @@ pip install -r requirements.txt
 Run the simulation:
 
 ```console
-python quantum-jax.py --show
+python quantum-stars.py --show
 ```
 
 ## How to Run (On Rusty)
