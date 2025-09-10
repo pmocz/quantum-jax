@@ -467,7 +467,7 @@ def main():
         plt.savefig(os.path.join(checkpoint_dir, f"snap{i:03d}.png"))
         if args.show:
             plt.pause(0.1)
-            plt.clf()
+        plt.clf()
         async_checkpoint_manager.wait_until_finished()
     jax.block_until_ready(state)
     print("Simulation Run Time (s): ", time.time() - t_start_timer)
