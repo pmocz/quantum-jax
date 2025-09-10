@@ -63,10 +63,10 @@ args = parser.parse_args()
 nx = 32 * args.res_factor
 
 # box dimensions (in units of kpc)
-Lx = 10.0
+Lx = 20.0
 
 # average density of dark matter in the simulation (in units of Msun / kpc^3)
-rho_bar = 10000.0
+rho_bar = 1.0e6
 
 # stop time (in units of kpc / (km/s) = 0.9778 Gyr)
 t_end = 10.0
@@ -75,19 +75,23 @@ t_end = 10.0
 m_22 = 1.0
 
 # black hole
-M_bh = 1.0e8  # XXX 1.0e6 # mass of black hole in Msun
+M_bh = 1.0e10  # mass of black hole (in Msun)
 
 # dark matter
-sigma = 10.0  # velocity dispersion of dm
+sigma = 200.0  # velocity dispersion of dm (in km/s)
+
+# soliton (optional)
+use_soliton_ics = False
+M_soliton = 1.0e9
 
 
 ##################
 # Global Constants
 
-G = 4.30241002e-6  # gravitational constant in kpc (km/s)^2 / Msun  |  [V^2][L]/[M]  |  (G / (km/s)^2 * (mass of sun) / kpc)
-hbar = 1.71818134e-87  # in [V][L][M] | (hbar / ((km/s) * kpc * mass of sun))
+G = 2.46509932e-4  # gravitational constant in kpc (km/s)^2 / Msun  |  [V^2][L]/[M]  |  (G / (km/s)^2 * (mass of sun) / kpc)
+hbar = 9.8444538e-86  # in [V][L][M] | (hbar / ((km/s) * kpc * mass of sun))
 ev_to_msun = 8.96215334e-67  # mass of electron volt in [M] | (eV/c^2/mass of sun)
-ev_to_internal = 8.05478173e-56  # eV to internal energy unites
+ev_to_internal = 8.05478173e-56  # eV to internal units (eV / (mass of sun * (km/s)^2))
 c = 299792.458  # speed of light in km/s
 m = m_22 * 1.0e-22 * ev_to_msun  # axion mass in [M]
 m_per_hbar = m / hbar  # (~0.052 1/([V][M]))
@@ -108,14 +112,19 @@ r_s = 2.0 * G * M_bh / c**2  # in kpc
 r_bondi_est = G * M_bh / (sigma**2)
 jeans_length = sigma * jnp.sqrt(1.0 / (G * rho_bar))
 n_jeans = Lx / jeans_length
-r_bondi_est = G * M_bh / (sigma**2)
+
+v_vir = G * M_soliton * m_per_hbar * jnp.sqrt(0.10851)
 
 # print some info
-print(f"# de Broglie wavelengths in box: {n_wavelengths:.2f}")
-print(f"# Jeans lengths in box: {n_jeans:.2f}")
-print(f"# r_s in box: {Lx / r_s:.2f}")
-print(f"# r_bondi_est in box: {Lx / r_bondi_est:.2f}")
-print(f"M_bh/M_dm: {M_bh / (Lx * Lx * Lx * rho_bar):.2f}")
+if use_soliton_ics:
+    print(f"M_bh/M_soliton: {M_bh / M_soliton:.2f}")
+else:
+    print(f"# de Broglie wavelengths in box: {n_wavelengths:.2f}")
+    print(f"# Jeans lengths in box: {n_jeans:.2f}")
+    print(f"# r_s in box: {Lx / r_s:.2f}")
+    print(f"# r_bondi_est in box: {Lx / r_bondi_est:.2f}")
+    print(f"M_bh/M_dm: {M_bh / (Lx * Lx * Lx * rho_bar):.2f}")
+    print(f"<rho>/rho_crit: {rho_bar / rho_crit:.2f}")
 
 
 ######
@@ -169,6 +178,8 @@ params["rho_bar"] = rho_bar
 params["sigma"] = sigma
 params["M_bh"] = M_bh
 params["t_end"] = t_end
+params["use_soliton_ics"] = use_soliton_ics
+params["M_soliton"] = M_soliton
 
 
 #########
@@ -294,8 +305,17 @@ def do_accretion(psi, pos, vel, m_bh):
     psi_amp = jnp.abs(psi_at_bh)
     psi_theta = jnp.angle(psi_at_bh)
 
-    # XXX TODO: implement me
-    dM_dt = 0.0
+    v = jnp.sqrt(sigma**2 + vel[0, 0] ** 2 + vel[0, 1] ** 2 + vel[0, 2] ** 2)
+    # XXX TODO: use alternate velocity estimate?
+    xi = 2.0 * jnp.pi * G * m_bh[0] * m_per_hbar / v
+    dM_dt = (
+        32.0
+        * jnp.pi**2
+        * (G * m_bh[0]) ** 3
+        * m_per_hbar
+        * psi_amp**2
+        / (c**3 * v * (1.0 - jnp.exp(-xi)))
+    )
 
     # transfer mass from dm to BH
     new_psi_amp = jnp.abs(psi_amp) - jnp.sqrt(dM_dt * dt / vol)
@@ -402,20 +422,28 @@ def main():
     t = 0.0
 
     # dark matter
-    # construct in fourier space according to Eq (27) of our paper [https://arxiv.org/abs/1801.03507]
-    np.random.seed(17)
-    # initialize random phases
-    psi = np.exp(1.0j * 2.0 * np.pi * np.random.rand(*k_sq.shape))
-    psi = jnp.array(psi)
-    psi *= np.sqrt(np.exp(-k_sq / (2.0 * sigma**2 * m_per_hbar**2)))
-    psi = np.fft.ifftn(psi)
-    # re-normalize it
-    psi *= jnp.sqrt(rho_bar / jnp.mean(jnp.abs(psi) ** 2))
+    if use_soliton_ics:
+        # soliton initial condition
+        r = jnp.sqrt((X - 0.5 * Lx) ** 2 + (Y - 0.5 * Lx) ** 2 + (Z - 0.5 * Lx) ** 2)
+        # XXX TODO implement me
+        assert False, "soliton ICs not implemented yet"
+    else:
+        # turbulent initial condition
+        # we initialize a random field with a gaussian power spectrum
+        # construct in fourier space according to Eq (27) of our paper [https://arxiv.org/abs/1801.03507]
+        np.random.seed(17)
+        # initialize random phases
+        psi = np.exp(1.0j * 2.0 * np.pi * np.random.rand(*k_sq.shape))
+        psi = jnp.array(psi)
+        psi *= np.sqrt(np.exp(-k_sq / (2.0 * sigma**2 * m_per_hbar**2)))
+        psi = np.fft.ifftn(psi)
+        # re-normalize it
+        psi *= jnp.sqrt(rho_bar / jnp.mean(jnp.abs(psi) ** 2))
 
-    # black hole
-    m_bh = M_bh * jnp.ones(n_bh)  # mass of each black hole
-    pos = 0.5 * Lx * jnp.ones((n_bh, 3))
-    vel = jnp.zeros((n_bh, 3))
+        # black hole
+        m_bh = M_bh * jnp.ones(n_bh)  # mass of each black hole
+        pos = 0.5 * Lx * jnp.ones((n_bh, 3))
+        vel = jnp.zeros((n_bh, 3))
 
     # Construct initial simulation state
     state = {}
@@ -434,7 +462,7 @@ def main():
         print(f"step {i}")
         state = jax.lax.fori_loop(0, nt_sub, update, init_val=state)
         async_checkpoint_manager.save(i, args=ocp.args.StandardSave(state))
-        print(f"   m_bh={state['m_bh'][0]:0.2e}")
+        print(f"   m_bh={state['m_bh'][0]:.3e}")
         plot_sim(state)
         plt.savefig(os.path.join(checkpoint_dir, f"snap{i:03d}.png"))
         if args.show:
