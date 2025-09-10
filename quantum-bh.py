@@ -63,7 +63,7 @@ args = parser.parse_args()
 nx = 32 * args.res_factor
 
 # box dimensions (in units of kpc)
-Lx = 20.0
+Lx = 10.0
 
 # average density of dark matter in the simulation (in units of Msun / kpc^3)
 rho_bar = 1.0e6
@@ -72,10 +72,10 @@ rho_bar = 1.0e6
 t_end = 10.0
 
 # axion mass (in units of 10^-22 eV)
-m_22 = 1.0
+m_22 = 5.0
 
 # black hole
-M_bh = 1.0e10  # mass of black hole (in Msun)
+M_bh = 5.0e8  # mass of black hole (in Msun)
 
 # dark matter
 sigma = 200.0  # velocity dispersion of dm (in km/s)
@@ -105,13 +105,14 @@ n_bh = 1  # number of black holes
 # check that de broglie wavelength fits into box
 de_broglie_wavelength = hbar / (m * sigma)
 n_wavelengths = Lx / de_broglie_wavelength
-assert n_wavelengths > 1
+assert n_wavelengths > 3, f"{n_wavelengths}"
 
 # check the Schwarzschild radius, bondi radius, jeans length
 r_s = 2.0 * G * M_bh / c**2  # in kpc
 r_bondi_est = G * M_bh / (sigma**2)
 jeans_length = sigma * jnp.sqrt(1.0 / (G * rho_bar))
 n_jeans = Lx / jeans_length
+assert n_jeans < 0.8, f"{n_jeans}"
 
 v_vir = G * M_soliton * m_per_hbar * jnp.sqrt(0.10851)
 
@@ -157,8 +158,8 @@ nt_sub = int(jnp.round(nt / 100.0))
 dt = t_end / nt
 
 
-# check that estimated bondi radius fits in a single cell
-# XXX assert r_bondi_est < dx
+# check that estimated bondi radius fits in box
+assert r_bondi_est < 0.5 * Lx, f"{r_bondi_est} {Lx}"
 
 ##############
 # Checkpointer
