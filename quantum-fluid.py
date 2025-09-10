@@ -58,7 +58,7 @@ nx = 32 * args.res_factor
 Lx = 1.0
 
 # average density of all matter (dm+gas) in the simulation (in units of Msun / kpc^3)
-rho_bar = 1.0e5
+rho_bar = 1.0e7
 
 # stop time (in units of kpc / (km/s) = 0.9778 Gyr)
 t_end = 10.0
@@ -402,7 +402,7 @@ def plot_sim(state):
 
     # DM projection
     rho_proj_dm = jnp.log10(jnp.mean(jnp.abs(state["psi"]) ** 2, axis=2))
-    vmin = jnp.log10(rho_bar * frac_dm * 0.5)
+    vmin = jnp.log10(rho_bar * frac_dm / 2.0)
     vmax = jnp.log10(rho_bar * frac_dm * 2.0)
     axs[0].imshow(
         rho_proj_dm,
@@ -419,8 +419,8 @@ def plot_sim(state):
 
     # Gas projection
     rho_proj_gas = jnp.log10(jnp.mean(state["rho"], axis=2))
-    vmin = jnp.log10(rho_bar * frac_gas * 0.5)
-    vmax = jnp.log10(rho_bar * frac_gas * 2.0)
+    vmin = jnp.log10(rho_bar * frac_gas / 1.2)
+    vmax = jnp.log10(rho_bar * frac_gas * 1.2)
     axs[1].imshow(
         rho_proj_gas,
         cmap="viridis",
