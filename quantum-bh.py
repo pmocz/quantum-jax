@@ -87,7 +87,7 @@ sigma = 100.0  # velocity dispersion of dm (in km/s)
 use_soliton_ics = False
 if args.soliton:
     use_soliton_ics = True
-M_soliton = 1.0e9
+M_soliton = 3.0e9
 
 
 ##################
