@@ -79,10 +79,10 @@ sigma = 10.0  # velocity dispersion of dm
 ##################
 # Global Constants
 
-G = 4.30241002e-6  # gravitational constant in kpc (km/s)^2 / Msun  |  [V^2][L]/[M]  |  (G / (km/s)^2 * (mass of sun) / kpc)
-hbar = 1.71818134e-87  # in [V][L][M] | (hbar / ((km/s) * kpc * mass of sun))
+G = 2.46509932e-4  # gravitational constant in kpc (km/s)^2 / Msun  |  [V^2][L]/[M]  |  (G / (km/s)^2 * (mass of sun) / kpc)
+hbar = 9.8444538e-86  # in [V][L][M] | (hbar / ((km/s) * kpc * mass of sun))
 ev_to_msun = 8.96215334e-67  # mass of electron volt in [M] | (eV/c^2/mass of sun)
-ev_to_internal = 8.05478173e-56  # eV to internal energy unites
+ev_to_internal = 8.05478173e-56  # eV to internal energy units (eV / (mass of sun * (km/s)^2))
 c = 299792.458  # speed of light in km/s
 m = m_22 * 1.0e-22 * ev_to_msun  # axion mass in [M]
 m_per_hbar = m / hbar  # (~0.052 1/([V][M]))
