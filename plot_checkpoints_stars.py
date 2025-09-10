@@ -7,27 +7,27 @@ import argparse
 import json
 
 """
-Plot checkpointed data.
+Plot checkpointed data of quantum-stars.py runs
 
 Philip Mocz (2025), @pmocz
 Flatiron Institute
 
 Example Usage:
 
-python plot_checkpoints.py
+python plot_checkpoints_stars.py
 
-python plot_checkpoints.py --res_factor 8
+python plot_checkpoints_stars.py --res_factor 8
 
 """
 
 # Command Line Input
-parser = argparse.ArgumentParser(description="Plot checkpoints.")
+parser = argparse.ArgumentParser(description="Plot checkpoints of quantum-stars.")
 parser.add_argument("--res_factor", type=int, default=1, help="Resolution factor")
 args = parser.parse_args()
 
 
 # Checkpointer
-path = os.path.join(os.path.dirname(__file__), f"checkpoints{args.res_factor}")
+path = os.path.join(os.path.dirname(__file__), f"checkpoints_stars{args.res_factor}")
 async_checkpoint_manager = ocp.CheckpointManager(path)
 
 

@@ -69,7 +69,7 @@ sbatch sbatch_rusty.sh
 Plot the results by running the script:
 
 ```console
-python plot_checkpoints.py
+python plot_checkpoints_stars.py
 ```
 
 Below is an example of a snapshot from a simulation:
