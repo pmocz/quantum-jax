@@ -54,6 +54,9 @@ python quantum-bh.py --res_factor 1
 parser = argparse.ArgumentParser(description="Simulate the Schrodinger-Poisson system.")
 parser.add_argument("--res_factor", type=int, default=1, help="Resolution factor")
 parser.add_argument("--show", action="store_true", help="Show live plots during run")
+parser.add_argument(
+    "--soliton", action="store_true", help="Run with soliton initial conditions"
+)
 args = parser.parse_args()
 
 # Enable for double precision
@@ -63,36 +66,38 @@ args = parser.parse_args()
 nx = 32 * args.res_factor
 
 # box dimensions (in units of kpc)
-Lx = 10.0
+Lx = 1.0
 
 # average density of dark matter in the simulation (in units of Msun / kpc^3)
-rho_bar = 1.0e6
+rho_bar = 1.0e8
 
 # stop time (in units of kpc / (km/s) = 0.9778 Gyr)
 t_end = 10.0
 
 # axion mass (in units of 10^-22 eV)
-m_22 = 5.0
+m_22 = 1.0
 
 # black hole
-M_bh = 5.0e8  # mass of black hole (in Msun)
+M_bh = 1.0e8  # mass of black hole (in Msun)
 
 # dark matter
-sigma = 200.0  # velocity dispersion of dm (in km/s)
+sigma = 100.0  # velocity dispersion of dm (in km/s)
 
 # soliton (optional)
 use_soliton_ics = False
+if args.soliton:
+    use_soliton_ics = True
 M_soliton = 1.0e9
 
 
 ##################
 # Global Constants
 
-G = 2.46509932e-4  # gravitational constant in kpc (km/s)^2 / Msun  |  [V^2][L]/[M]  |  (G / (km/s)^2 * (mass of sun) / kpc)
-hbar = 9.8444538e-86  # in [V][L][M] | (hbar / ((km/s) * kpc * mass of sun))
+G = 4.30241002e-6  # gravitational constant in kpc (km/s)^2 / Msun  |  [V^2][L]/[M]  |  (G / (km/s)^2 * (mass of sun) / kpc)
+hbar = 1.71818134e-87  # in [V][L][M] | (hbar / ((km/s) * kpc * mass of sun))
 ev_to_msun = 8.96215334e-67  # mass of electron volt in [M] | (eV/c^2/mass of sun)
 ev_to_internal = 8.05478173e-56  # eV to internal units (eV / (mass of sun * (km/s)^2))
-c = 299792.458  # speed of light in km/s
+c = 299792.458  # speed of light in km/s (c / (km/s))
 m = m_22 * 1.0e-22 * ev_to_msun  # axion mass in [M]
 m_per_hbar = m / hbar  # (~0.052 1/([V][M]))
 
@@ -114,11 +119,14 @@ jeans_length = sigma * jnp.sqrt(1.0 / (G * rho_bar))
 n_jeans = Lx / jeans_length
 assert n_jeans < 0.8, f"{n_jeans}"
 
+r_soliton = 2.2e8 * m_22**-2 / M_soliton  # in kpc
+assert r_soliton < 0.5 * Lx
 v_vir = G * M_soliton * m_per_hbar * jnp.sqrt(0.10851)
 
 # print some info
 if use_soliton_ics:
     print(f"M_bh/M_soliton: {M_bh / M_soliton:.2f}")
+    print(f"# r_soliton in box: {Lx / r_soliton:.2f}")
 else:
     print(f"# de Broglie wavelengths in box: {n_wavelengths:.2f}")
     print(f"# Jeans lengths in box: {n_jeans:.2f}")
@@ -140,6 +148,8 @@ X, Y, Z = jnp.meshgrid(x_lin, x_lin, x_lin, indexing="ij")
 # checks
 v_resolved = (hbar / m) * jnp.pi / dx
 assert v_resolved > sigma
+assert r_soliton > 2.0 * dx
+assert v_resolved > v_vir
 
 # Fourier Space Variables
 kx_lin = 2.0 * jnp.pi / Lx * jnp.arange(-nx / 2, nx / 2)
@@ -394,8 +404,8 @@ def plot_sim(state):
     """Plot the simulation state."""
     # DM projection
     rho_proj_dm = jnp.log10(jnp.mean(jnp.abs(state["psi"]) ** 2, axis=2)).T
-    vmin = jnp.log10(rho_bar / 8.0)
-    vmax = jnp.log10(rho_bar * 8.0)
+    vmin = jnp.log10(rho_bar / 10.0)
+    vmax = jnp.log10(rho_bar * 10.0)
     plt.imshow(
         rho_proj_dm,
         cmap="plasma",
@@ -426,8 +436,18 @@ def main():
     if use_soliton_ics:
         # soliton initial condition
         r = jnp.sqrt((X - 0.5 * Lx) ** 2 + (Y - 0.5 * Lx) ** 2 + (Z - 0.5 * Lx) ** 2)
-        # XXX TODO implement me
-        assert False, "soliton ICs not implemented yet"
+        psi = (
+            jnp.sqrt(
+                1.9e7
+                * m_22**-2
+                * r_soliton**-4
+                / (1.0 + 0.091 * (r / r_soliton) ** 2) ** 8
+            )
+            + 0.0j
+        )
+        # re-calculate rho_bar
+        global rho_bar
+        rho_bar = jnp.mean(jnp.abs(psi) ** 2, axis=(0, 1, 2))
     else:
         # turbulent initial condition
         # we initialize a random field with a gaussian power spectrum
@@ -441,10 +461,10 @@ def main():
         # re-normalize it
         psi *= jnp.sqrt(rho_bar / jnp.mean(jnp.abs(psi) ** 2))
 
-        # black hole
-        m_bh = M_bh * jnp.ones(n_bh)  # mass of each black hole
-        pos = 0.5 * Lx * jnp.ones((n_bh, 3))
-        vel = jnp.zeros((n_bh, 3))
+    # black hole
+    m_bh = M_bh * jnp.ones(n_bh)  # mass of each black hole
+    pos = 0.5 * Lx * jnp.ones((n_bh, 3))
+    vel = jnp.zeros((n_bh, 3))
 
     # Construct initial simulation state
     state = {}
