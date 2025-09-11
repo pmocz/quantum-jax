@@ -54,7 +54,7 @@ args = parser.parse_args()
 nx = 32 * args.res
 
 # box dimensions (in units of kpc)
-Lx = 1.0
+Lx = 4.0
 
 # average density of all matter (dm+gas) in the simulation (in units of Msun / kpc^3)
 rho_bar = 1.0e7
@@ -66,13 +66,13 @@ t_end = 10.0
 m_22 = 1.0
 
 # gas
-frac_gas = 0.2  # fraction of total mass in gas
+frac_gas = 0.15  # fraction of total mass in gas
 rho_gas = frac_gas * rho_bar  # average density of gas
-cs = 10.0  # sound speed (km/s)
+cs = 20.0  # sound speed (km/s)
 
 # dark matter
 frac_dm = 1.0 - frac_gas  # fraction of total mass in dark matter
-sigma = 100.0  # velocity dispersion of dm
+sigma = 40.0  # velocity dispersion of dm
 
 
 ##################
@@ -99,7 +99,7 @@ assert n_wavelengths > 1
 # check the Jeans length
 jeans_length = cs * jnp.sqrt(jnp.pi / (G * rho_gas))
 n_jeans = Lx / jeans_length
-assert n_jeans < 1
+assert n_jeans < 0.5
 
 # print some info
 print(f"# de Broglie wavelengths in box: {n_wavelengths:.2f}")
@@ -418,8 +418,8 @@ def plot_sim(state):
 
     # Gas projection
     rho_proj_gas = jnp.log10(jnp.mean(state["rho"], axis=2))
-    vmin = jnp.log10(rho_bar * frac_gas / 1.2)
-    vmax = jnp.log10(rho_bar * frac_gas * 1.2)
+    vmin = jnp.log10(rho_bar * frac_gas / 2.0)
+    vmax = jnp.log10(rho_bar * frac_gas * 2.0)
     axs[1].imshow(
         rho_proj_gas,
         cmap="viridis",
