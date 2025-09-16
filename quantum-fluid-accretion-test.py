@@ -35,7 +35,7 @@ https://arxiv.org/abs/1705.05845
 
 Example Usage:
 
-python quantum-fluid.py --res 1
+python quantum-fluid-accretion-test.py --res 1
 
 """
 
