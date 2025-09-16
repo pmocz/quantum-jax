@@ -6,6 +6,7 @@
 
 import jax
 import jax.numpy as jnp
+
 # import orbax.checkpoint as ocp
 import numpy as np
 import matplotlib.pyplot as plt
@@ -177,14 +178,17 @@ params["frac_dm"] = frac_dm
 #########
 # Gravity
 
+
 def get_potential(rho):
     """Solve the Poisson equation."""
     V_hat = -jnp.fft.fftn(4.0 * jnp.pi * G * (rho - rho_bar)) / (k_sq + (k_sq == 0))
     V = jnp.real(jnp.fft.ifftn(V_hat))
     return V
 
+
 #####
 # Gas
+
 
 def get_conserved(rho, vx, vy, vz, vol):
     Mass = rho * vol
@@ -241,6 +245,7 @@ def apply_fluxes(F, flux_F_X, flux_F_Y, flux_F_Z, dx, dt):
 
     return F
 
+
 def get_flux(rho_L, vx_L, vy_L, vz_L, rho_R, vx_R, vy_R, vz_R):
     # compute star (averaged) states
     rho_star = 0.5 * (rho_L + rho_R)
@@ -283,6 +288,7 @@ def apply_grav_accel(rho, vx, vy, vz, dt):
 
     return vx, vy, vz
 
+
 def get_accel_from_rho(rho):
     """Return gravitational acceleration field (ax,ay,az) from a density rho."""
     V_hat = -jnp.fft.fftn(4.0 * jnp.pi * G * (rho - rho_bar)) / (k_sq + (k_sq == 0))
@@ -291,25 +297,41 @@ def get_accel_from_rho(rho):
     az = -jnp.real(jnp.fft.ifftn(1.0j * kz * V_hat))
     return ax, ay, az
 
+
 def sample_cic(field, x_bh, dx, nx):
     """Trilinear (CIC) sample of a grid field at particle position x_bh."""
     xi = x_bh / dx - 0.5
     i0 = jnp.floor(xi).astype(int)
-    f  = xi - i0
-    def mod(i): return jnp.mod(i, nx)
+    f = xi - i0
 
-    ii = jnp.array([i0[0], i0[0]+1, i0[0],     i0[0],     i0[0]+1, i0[0]+1, i0[0],     i0[0]+1])
-    jj = jnp.array([i0[1], i0[1],   i0[1]+1,   i0[1],     i0[1]+1, i0[1],   i0[1]+1,   i0[1]+1])
-    kk = jnp.array([i0[2], i0[2],   i0[2],     i0[2]+1,   i0[2],   i0[2]+1, i0[2]+1,   i0[2]+1])
-    w  = jnp.array([
-        (1-f[0])*(1-f[1])*(1-f[2]), f[0]*(1-f[1])*(1-f[2]),
-        (1-f[0])*f[1]*(1-f[2]),     (1-f[0])*(1-f[1])*f[2],
-        f[0]*f[1]*(1-f[2]),         f[0]*(1-f[1])*f[2],
-        (1-f[0])*f[1]*f[2],         f[0]*f[1]*f[2],
-    ])
+    def mod(i):
+        return jnp.mod(i, nx)
+
+    ii = jnp.array(
+        [i0[0], i0[0] + 1, i0[0], i0[0], i0[0] + 1, i0[0] + 1, i0[0], i0[0] + 1]
+    )
+    jj = jnp.array(
+        [i0[1], i0[1], i0[1] + 1, i0[1], i0[1] + 1, i0[1], i0[1] + 1, i0[1] + 1]
+    )
+    kk = jnp.array(
+        [i0[2], i0[2], i0[2], i0[2] + 1, i0[2], i0[2] + 1, i0[2] + 1, i0[2] + 1]
+    )
+    w = jnp.array(
+        [
+            (1 - f[0]) * (1 - f[1]) * (1 - f[2]),
+            f[0] * (1 - f[1]) * (1 - f[2]),
+            (1 - f[0]) * f[1] * (1 - f[2]),
+            (1 - f[0]) * (1 - f[1]) * f[2],
+            f[0] * f[1] * (1 - f[2]),
+            f[0] * (1 - f[1]) * f[2],
+            (1 - f[0]) * f[1] * f[2],
+            f[0] * f[1] * f[2],
+        ]
+    )
 
     vals = field[mod(ii), mod(jj), mod(kk)]
     return jnp.sum(w * vals)
+
 
 def solve_hydro(rho, vx, vy, vz, dt):
     # calculate gradients
@@ -375,14 +397,17 @@ def solve_hydro(rho, vx, vy, vz, dt):
 
     return rho, vx, vy, vz
 
+
 #######################
 # BH sink helpers (gas-only accretion; no v_rel yet)
 
 LAMBDA_ISO = jnp.exp(1.5) / 4.0  # ≈ 1.12
 
+
 def _periodic_delta_1d(xs, x0, L):
     d = jnp.abs(xs - x0)
     return jnp.minimum(d, L - d)
+
 
 def bh_cic_density(nx, M_bh, x_bh, dx, Lx):
     """Deposit BH mass to the grid with CIC (for gravity only). Returns a rho_bh grid."""
@@ -390,63 +415,76 @@ def bh_cic_density(nx, M_bh, x_bh, dx, Lx):
     xi = x_bh / dx - 0.5
     i0 = jnp.floor(xi).astype(int)
     f = xi - i0
-    def mod(i): return jnp.mod(i, nx)
+
+    def mod(i):
+        return jnp.mod(i, nx)
+
     # 8-corner weights
-    w = jnp.array([
-        (1-f[0])*(1-f[1])*(1-f[2]), f[0]*(1-f[1])*(1-f[2]),
-        (1-f[0])*f[1]*(1-f[2]),     (1-f[0])*(1-f[1])*f[2],
-        f[0]*f[1]*(1-f[2]),         f[0]*(1-f[1])*f[2],
-        (1-f[0])*f[1]*f[2],         f[0]*f[1]*f[2],
-    ])
-    inds = jnp.array([
-        (mod(i0[0]  ), mod(i0[1]  ), mod(i0[2]  )),
-        (mod(i0[0]+1), mod(i0[1]  ), mod(i0[2]  )),
-        (mod(i0[0]  ), mod(i0[1]+1), mod(i0[2]  )),
-        (mod(i0[0]  ), mod(i0[1]  ), mod(i0[2]+1)),
-        (mod(i0[0]+1), mod(i0[1]+1), mod(i0[2]  )),
-        (mod(i0[0]+1), mod(i0[1]  ), mod(i0[2]+1)),
-        (mod(i0[0]  ), mod(i0[1]+1), mod(i0[2]+1)),
-        (mod(i0[0]+1), mod(i0[1]+1), mod(i0[2]+1)),
-    ])
+    w = jnp.array(
+        [
+            (1 - f[0]) * (1 - f[1]) * (1 - f[2]),
+            f[0] * (1 - f[1]) * (1 - f[2]),
+            (1 - f[0]) * f[1] * (1 - f[2]),
+            (1 - f[0]) * (1 - f[1]) * f[2],
+            f[0] * f[1] * (1 - f[2]),
+            f[0] * (1 - f[1]) * f[2],
+            (1 - f[0]) * f[1] * f[2],
+            f[0] * f[1] * f[2],
+        ]
+    )
+    inds = jnp.array(
+        [
+            (mod(i0[0]), mod(i0[1]), mod(i0[2])),
+            (mod(i0[0] + 1), mod(i0[1]), mod(i0[2])),
+            (mod(i0[0]), mod(i0[1] + 1), mod(i0[2])),
+            (mod(i0[0]), mod(i0[1]), mod(i0[2] + 1)),
+            (mod(i0[0] + 1), mod(i0[1] + 1), mod(i0[2])),
+            (mod(i0[0] + 1), mod(i0[1]), mod(i0[2] + 1)),
+            (mod(i0[0]), mod(i0[1] + 1), mod(i0[2] + 1)),
+            (mod(i0[0] + 1), mod(i0[1] + 1), mod(i0[2] + 1)),
+        ]
+    )
     # mass density per cell = (w * M_bh) / vol
     for k in range(8):
-        i,j,kz = inds[k]
+        i, j, kz = inds[k]
         rho_bh = rho_bh.at[i, j, kz].add(w[k] * M_bh / (dx**3))
     return rho_bh
 
-def bh_bondi_step_no_vrel(rho, M_bh, x_bh, dx, Lx, cs, G, dt,
-                          r_acc_mult=R_ACC_MULT, lam=LAMBDA_ISO, fmax=0.25):
+
+def bh_bondi_step_no_vrel(
+    rho, M_bh, x_bh, dx, Lx, cs, G, dt, r_acc_mult=R_ACC_MULT, lam=LAMBDA_ISO, fmax=0.25
+):
     """
     Isothermal Bondi accretion (v_rel=0). Removes gas with a Gaussian kernel.
     Returns: rho_new, M_bh_new, dMdt, rho_inf, r_B, dM
     """
     nx = rho.shape[0]
     # Bondi radius (no relative velocity)
-    r_B   = G * M_bh / (cs*cs)
+    r_B = G * M_bh / (cs * cs)
     r_acc = r_acc_mult * dx
-    rK    = jnp.clip(r_B, 0.25*dx, 0.5*r_acc)
+    rK = jnp.clip(r_B, 0.25 * dx, 0.5 * r_acc)
 
     xs = (jnp.arange(nx) + 0.5) * dx
     DX = _periodic_delta_1d(xs, x_bh[0], Lx)
     DY = _periodic_delta_1d(xs, x_bh[1], Lx)
     DZ = _periodic_delta_1d(xs, x_bh[2], Lx)
     dX, dY, dZ = jnp.meshgrid(DX, DY, DZ, indexing="ij")
-    R2   = dX*dX + dY*dY + dZ*dZ
-    mask = (R2 <= r_acc*r_acc)
-    W    = jnp.exp(-0.5 * R2 / (rK*rK)) * mask
+    R2 = dX * dX + dY * dY + dZ * dZ
+    mask = R2 <= r_acc * r_acc
+    W = jnp.exp(-0.5 * R2 / (rK * rK)) * mask
 
     # Ambient density (Gaussian weighted)
-    sumW    = jnp.sum(W) + 1e-30
+    sumW = jnp.sum(W) + 1e-30
     rho_inf = jnp.sum(W * rho) / sumW
 
     # Bondi rate (isothermal; v_rel=0)
-    dMdt = 4.0 * jnp.pi * lam * (G*M_bh)**2 * rho_inf / (cs**3)
-    dM   = dMdt * dt
+    dMdt = 4.0 * jnp.pi * lam * (G * M_bh) ** 2 * rho_inf / (cs**3)
+    dM = dMdt * dt
 
     # Cap by available gas and per-cell safety
-    WRho   = W * rho
+    WRho = W * rho
     sumWRho = jnp.sum(WRho) + 1e-30
-    phi    = WRho / sumWRho            # normalized kernel for removal
+    phi = WRho / sumWRho  # normalized kernel for removal
     M_avail_kernel = jnp.sum(rho * mask) * (dx**3)
     dM_cap = jnp.minimum(dM, fmax * M_avail_kernel)
 
@@ -455,10 +493,14 @@ def bh_bondi_step_no_vrel(rho, M_bh, x_bh, dx, Lx, cs, G, dt,
     M_bh_new = M_bh + dM_cap
     return rho_new, M_bh_new, dMdt, rho_inf, r_B, dM_cap
 
+
 #######################
 # Main part of the code
 
-def compute_step(psi, rho, vx, vy, vz, t, M_bh, x_bh, vxbh, vybh, vzbh, include_bh_gravity=True):
+
+def compute_step(
+    psi, rho, vx, vy, vz, t, M_bh, x_bh, vxbh, vybh, vzbh, include_bh_gravity=True
+):
     """Compute the next step in the simulation (BH moves and accretes gas)."""
 
     # --- Half-kick for BH from DM+gas only (avoid self-force) ---
@@ -515,14 +557,38 @@ def compute_step(psi, rho, vx, vy, vz, t, M_bh, x_bh, vxbh, vybh, vzbh, include_
 
     return psi, rho, vx, vy, vz, t, M_bh, x_bh, vxbh, vybh, vzbh, dMdt, rho_inf, r_B
 
+
 @jax.jit
 def update(_, state):
     """Update the state of the system by one time step."""
-    (state["psi"], state["rho"], state["vx"], state["vy"], state["vz"],
-     state["t"], state["M_bh"], state["x_bh"], state["vxbh"], state["vybh"], state["vzbh"],
-     state["bh_dMdt"], state["bh_rho_inf"], state["bh_r_B"]) = compute_step(
-        state["psi"], state["rho"], state["vx"], state["vy"], state["vz"], state["t"],
-        state["M_bh"], state["x_bh"], state["vxbh"], state["vybh"], state["vzbh"], True
+    (
+        state["psi"],
+        state["rho"],
+        state["vx"],
+        state["vy"],
+        state["vz"],
+        state["t"],
+        state["M_bh"],
+        state["x_bh"],
+        state["vxbh"],
+        state["vybh"],
+        state["vzbh"],
+        state["bh_dMdt"],
+        state["bh_rho_inf"],
+        state["bh_r_B"],
+    ) = compute_step(
+        state["psi"],
+        state["rho"],
+        state["vx"],
+        state["vy"],
+        state["vz"],
+        state["t"],
+        state["M_bh"],
+        state["x_bh"],
+        state["vxbh"],
+        state["vybh"],
+        state["vzbh"],
+        True,
     )
     return state
 
@@ -536,32 +602,52 @@ def plot_sim(state):
     vmin = jnp.log10(rho_bar * frac_dm / 2.0)
     vmax = jnp.log10(rho_bar * frac_dm * 2.0)
     im0 = axs[0].imshow(
-        rho_proj_dm, cmap="inferno", origin="lower",
-        extent=(0, nx, 0, nx), vmin=vmin, vmax=vmax,
+        rho_proj_dm,
+        cmap="inferno",
+        origin="lower",
+        extent=(0, nx, 0, nx),
+        vmin=vmin,
+        vmax=vmax,
     )
-    axs[0].set_aspect("equal"); axs[0].get_xaxis().set_visible(False); axs[0].get_yaxis().set_visible(False)
+    axs[0].set_aspect("equal")
+    axs[0].get_xaxis().set_visible(False)
+    axs[0].get_yaxis().set_visible(False)
 
     # Gas projection
     rho_proj_gas = jnp.log10(jnp.mean(state["rho"], axis=2))
     vmin = jnp.log10(rho_bar * frac_gas / 2.0)
     vmax = jnp.log10(rho_bar * frac_gas * 2.0)
     im1 = axs[1].imshow(
-        rho_proj_gas, cmap="viridis", origin="lower",
-        extent=(0, nx, 0, nx), vmin=vmin, vmax=vmax,
+        rho_proj_gas,
+        cmap="viridis",
+        origin="lower",
+        extent=(0, nx, 0, nx),
+        vmin=vmin,
+        vmax=vmax,
     )
-    axs[1].set_aspect("equal"); axs[1].get_xaxis().set_visible(False); axs[1].get_yaxis().set_visible(False)
+    axs[1].set_aspect("equal")
+    axs[1].get_xaxis().set_visible(False)
+    axs[1].get_yaxis().set_visible(False)
 
     # --- BH overlay (pixel coords) ---
     xpix = (state["x_bh"][0] / dx) - 0.5
     ypix = (state["x_bh"][1] / dx) - 0.5
-    bh0 = axs[0].plot([float(xpix)], [float(ypix)], marker="o", mfc="none", mec="w", mew=1.5, ms=7)[0]
-    bh1 = axs[1].plot([float(xpix)], [float(ypix)], marker="o", mfc="none", mec="w", mew=1.5, ms=7)[0]
+    bh0 = axs[0].plot(
+        [float(xpix)], [float(ypix)], marker="o", mfc="none", mec="w", mew=1.5, ms=7
+    )[0]
+    bh1 = axs[1].plot(
+        [float(xpix)], [float(ypix)], marker="o", mfc="none", mec="w", mew=1.5, ms=7
+    )[0]
 
     # --- Sink radius circle (in pixel units) ---
     r_acc = R_ACC_MULT * dx
     rad_px = float(r_acc / dx)
-    sink0 = Circle((float(xpix), float(ypix)), radius=rad_px, fill=False, ec="w", lw=1.0, ls=":")
-    sink1 = Circle((float(xpix), float(ypix)), radius=rad_px, fill=False, ec="w", lw=1.0, ls=":")
+    sink0 = Circle(
+        (float(xpix), float(ypix)), radius=rad_px, fill=False, ec="w", lw=1.0, ls=":"
+    )
+    sink1 = Circle(
+        (float(xpix), float(ypix)), radius=rad_px, fill=False, ec="w", lw=1.0, ls=":"
+    )
     axs[0].add_patch(sink0)
     axs[1].add_patch(sink1)
 
@@ -570,24 +656,27 @@ def plot_sim(state):
 
 
 def _radial_profile(field, center, dx, Lx, nbins=32):
-    """Spherical average with minimum-image periodic distances (NumPy for binning)."""
+    """Spherical average with minimum-image periodic distances"""
     nx = field.shape[0]
     xs = (np.arange(nx) + 0.5) * float(dx)
+
     def d1d(a, a0, L):
         d = np.abs(a - a0)
         return np.minimum(d, L - d)
-    DX = d1d(xs[:,None,None], center[0], Lx)
-    DY = d1d(xs[None,:,None], center[1], Lx)
-    DZ = d1d(xs[None,None,:], center[2], Lx)
-    r = np.sqrt(DX*DX + DY*DY + DZ*DZ).ravel()
+
+    DX = d1d(xs[:, None, None], center[0], Lx)
+    DY = d1d(xs[None, :, None], center[1], Lx)
+    DZ = d1d(xs[None, None, :], center[2], Lx)
+    r = np.sqrt(DX * DX + DY * DY + DZ * DZ).ravel()
     f = np.asarray(field).ravel()
-    r_max = Lx/2.0
-    bins = np.linspace(0.0, r_max, nbins+1)
+    r_max = Lx / 2.0
+    bins = np.linspace(0.0, r_max, nbins + 1)
     num, _ = np.histogram(r, bins=bins, weights=f)
     den, _ = np.histogram(r, bins=bins)
     prof = num / np.maximum(den, 1)
-    rc = 0.5*(bins[:-1]+bins[1:])
+    rc = 0.5 * (bins[:-1] + bins[1:])
     return rc, prof
+
 
 def main():
     """Main physics simulation."""
@@ -622,23 +711,29 @@ def main():
     state["vz"] = vz
 
     # --- BH state (centered) ---
-    state["x_bh"] = jnp.array([0.5*Lx, 0.5*Lx, 0.5*Lx])  # center of the box
+    state["x_bh"] = jnp.array([0.5 * Lx, 0.5 * Lx, 0.5 * Lx])  # center of the box
     state["M_bh"] = jnp.array(1.0e6)  # Msun (10e5)
-    state["vxbh"] = jnp.array(0.0)    # NEW
-    state["vybh"] = jnp.array(0.0)    # NEW
-    state["vzbh"] = jnp.array(0.0)    # NEW
+    state["vxbh"] = jnp.array(0.0)  # NEW
+    state["vybh"] = jnp.array(0.0)  # NEW
+    state["vzbh"] = jnp.array(0.0)  # NEW
     state["bh_dMdt"] = jnp.array(0.0)
     state["bh_rho_inf"] = jnp.array(rho_gas)
-    state["bh_r_B"] = jnp.array(G*state["M_bh"]/cs**2)
-
+    state["bh_r_B"] = jnp.array(G * state["M_bh"] / cs**2)
 
     # history trackers
-    history = {"time": [], "M_bh": [], "dMdt": [], "rho_inf": [], "r_B": [],
-               "rc": None, "prof_dm": [], "prof_gas": []}
+    history = {
+        "time": [],
+        "M_bh": [],
+        "dMdt": [],
+        "rho_inf": [],
+        "r_B": [],
+        "rc": None,
+        "prof_dm": [],
+        "prof_gas": [],
+    }
 
-        # Plot the initial state
-        # Plot the initial state
-    fig, axs, im0, im1, bh0, bh1, sink0, sink1 = plot_sim(state)  # now returns sink circles too
+    # Plot the initial state
+    fig, axs, im0, im1, bh0, bh1, sink0, sink1 = plot_sim(state)
 
     # Simulation Main Loop  -> animation
     print("Starting simulation ...")
@@ -647,11 +742,11 @@ def main():
     # precompute static color limits to match plot_sim each frame
     vmin_dm = float(jnp.log10(rho_bar * frac_dm / 2.0))
     vmax_dm = float(jnp.log10(rho_bar * frac_dm * 2.0))
-    vmin_g  = float(jnp.log10(rho_bar * frac_gas / 2.0))
-    vmax_g  = float(jnp.log10(rho_bar * frac_gas * 2.0))
+    vmin_g = float(jnp.log10(rho_bar * frac_gas / 2.0))
+    vmax_g = float(jnp.log10(rho_bar * frac_gas * 2.0))
 
     # cache center for profiles
-    center_np = np.array([0.5*float(Lx), 0.5*float(Lx), 0.5*float(Lx)])
+    center_np = np.array([0.5 * float(Lx), 0.5 * float(Lx), 0.5 * float(Lx)])
 
     def animate(i):
         nonlocal state, history, bh0, bh1, sink0, sink1
@@ -661,22 +756,29 @@ def main():
         state = jax.lax.fori_loop(0, nt_sub, update, init_val=state)
 
         # DM projection
-        rho_proj_dm = np.array(jnp.log10(jnp.mean(jnp.abs(state["psi"]) ** 2, axis=2) + 1e-30))
-        im0.set_data(rho_proj_dm); im0.set_clim(vmin_dm, vmax_dm)
+        rho_proj_dm = np.array(
+            jnp.log10(jnp.mean(jnp.abs(state["psi"]) ** 2, axis=2) + 1e-30)
+        )
+        im0.set_data(rho_proj_dm)
+        im0.set_clim(vmin_dm, vmax_dm)
 
         # Gas projection
         rho_proj_gas = np.array(jnp.log10(jnp.mean(state["rho"], axis=2) + 1e-30))
-        im1.set_data(rho_proj_gas); im1.set_clim(vmin_g, vmax_g)
+        im1.set_data(rho_proj_gas)
+        im1.set_clim(vmin_g, vmax_g)
 
         # Update BH marker and sink radius circle positions
         xpix = float(state["x_bh"][0] / dx - 0.5)
         ypix = float(state["x_bh"][1] / dx - 0.5)
-        bh0.set_data([xpix], [ypix]);  bh1.set_data([xpix], [ypix])
+        bh0.set_data([xpix], [ypix])
+        bh1.set_data([xpix], [ypix])
 
         # (sink radius is constant in this model; if you want Bondi radius instead, set rad_px = float(state["bh_r_B"]/dx))
         rad_px = float(R_ACC_MULT)  # since r_acc = R_ACC_MULT * dx
-        sink0.center = (xpix, ypix); sink1.center = (xpix, ypix)
-        sink0.set_radius(rad_px);     sink1.set_radius(rad_px)
+        sink0.center = (xpix, ypix)
+        sink1.center = (xpix, ypix)
+        sink0.set_radius(rad_px)
+        sink1.set_radius(rad_px)
 
         # log BH diagnostics
         history["time"].append(float(state["t"]))
@@ -686,10 +788,12 @@ def main():
         history["r_B"].append(float(state["bh_r_B"]))
 
         # radial profiles (current snapshot)
-        dm_density = np.array(jnp.abs(state["psi"])**2)
+        dm_density = np.array(jnp.abs(state["psi"]) ** 2)
         gas_density = np.array(state["rho"])
-        rc, p_dm = _radial_profile(dm_density, center_np, float(dx), float(Lx), nbins=32)
-        _,  p_g  = _radial_profile(gas_density, center_np, float(dx), float(Lx), nbins=32)
+        rc, p_dm = _radial_profile(
+            dm_density, center_np, float(dx), float(Lx), nbins=32
+        )
+        _, p_g = _radial_profile(gas_density, center_np, float(dx), float(Lx), nbins=32)
         history["rc"] = rc
         history["prof_dm"].append(p_dm)
         history["prof_gas"].append(p_g)
@@ -701,8 +805,9 @@ def main():
         # return the updated artists (enable blitting)
         return [im0, im1, bh0, bh1, sink0, sink1]
 
-    ani = animation.FuncAnimation(fig, animate, frames=100, interval=100,
-                                  blit=True, repeat=False)
+    ani = animation.FuncAnimation(
+        fig, animate, frames=100, interval=100, blit=True, repeat=False
+    )
     display(HTML(ani.to_jshtml()))  # inline animation (no saving)
 
     jax.block_until_ready(state)
@@ -712,4 +817,3 @@ def main():
 
 if __name__ == "__main__":
     hist = main()
-
