@@ -178,3 +178,4 @@ cython_debug/
 output/
 checkpoint*
 slurm*
+*.gif
