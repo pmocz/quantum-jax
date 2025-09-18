@@ -285,6 +285,12 @@ def solve_hydro(rho, vx, vy, vz, dt):
     vy_dx, vy_dy, vy_dz = get_gradient(vy, dx)
     vz_dx, vz_dy, vz_dz = get_gradient(vz, dx)
 
+    # slope limit gradients
+    rho_dx, rho_dy, rho_dz = slope_limiter(rho, dx, rho_dx, rho_dy, rho_dz)
+    vx_dx, vx_dy, vx_dz = slope_limiter(vx, dx, vx_dx, vx_dy, vx_dz)
+    vy_dx, vy_dy, vy_dz = slope_limiter(vy, dx, vy_dx, vy_dy, vy_dz)
+    vz_dx, vz_dy, vz_dz = slope_limiter(vz, dx, vz_dx, vz_dy, vz_dz)
+
     # extrapolate half-step in time
     rho_prime = rho - 0.5 * dt * (
         vx * rho_dx
@@ -341,6 +347,64 @@ def solve_hydro(rho, vx, vy, vz, dt):
     rho, vx, vy, vz = get_primitive(Mass, Momx, Momy, Momz, vol)
 
     return rho, vx, vy, vz
+
+
+def slope_limiter(f, dx, f_dx, f_dy, f_dz):
+    """
+    Apply slope limiter to slopes (minmod)
+    """
+
+    eps = 1.0e-12
+
+    # Keep a copy of the original slopes
+    orig_f_dx = f_dx
+    orig_f_dy = f_dy
+    orig_f_dz = f_dz
+
+    # Function to adjust the denominator safely
+    def adjust_denominator(denom):
+        denom_safe = jnp.where(
+            denom > 0, denom + eps, jnp.where(denom < 0, denom - eps, eps)
+        )
+        return denom_safe
+
+    # For x-direction
+    denom = adjust_denominator(orig_f_dx)
+    num = (f - jnp.roll(f, 1, axis=0)) / dx
+    ratio = num / denom
+    limiter = jnp.maximum(0.0, jnp.minimum(1.0, ratio))
+    f_dx = limiter * f_dx
+
+    num = -(f - jnp.roll(f, -1, axis=0)) / dx
+    ratio = num / denom  # Use the same adjusted denominator
+    limiter = jnp.maximum(0.0, jnp.minimum(1.0, ratio))
+    f_dx = limiter * f_dx
+
+    # For y-direction
+    denom = adjust_denominator(orig_f_dy)
+    num = (f - jnp.roll(f, 1, axis=1)) / dx
+    ratio = num / denom
+    limiter = jnp.maximum(0.0, jnp.minimum(1.0, ratio))
+    f_dy = limiter * f_dy
+
+    num = -(f - jnp.roll(f, -1, axis=1)) / dx
+    ratio = num / denom
+    limiter = jnp.maximum(0.0, jnp.minimum(1.0, ratio))
+    f_dy = limiter * f_dy
+
+    # For z-direction
+    denom = adjust_denominator(orig_f_dz)
+    num = (f - jnp.roll(f, 1, axis=2)) / dx
+    ratio = num / denom
+    limiter = jnp.maximum(0.0, jnp.minimum(1.0, ratio))
+    f_dz = limiter * f_dz
+
+    num = -(f - jnp.roll(f, -1, axis=2)) / dx
+    ratio = num / denom
+    limiter = jnp.maximum(0.0, jnp.minimum(1.0, ratio))
+    f_dz = limiter * f_dz
+
+    return f_dx, f_dy, f_dz
 
 
 #######################
