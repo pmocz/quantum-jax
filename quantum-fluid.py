@@ -535,7 +535,7 @@ def main():
     # Plot the initial state
     plot_sim(state)
     plt.savefig(os.path.join(checkpoint_dir, "initial.png"), dpi=240)
-    plt.clf()
+    plt.close()
 
     # Simulation Main Loop
     print("Starting simulation ...")
@@ -548,6 +548,7 @@ def main():
         async_checkpoint_manager.save(i, args=ocp.args.StandardSave(state))
         plot_sim(state)
         plt.savefig(os.path.join(checkpoint_dir, f"snap{i:03d}.png"))
+        plt.close()
         async_checkpoint_manager.wait_until_finished()
     jax.block_until_ready(state)
     print("Simulation Run Time (s): ", time.time() - t_start_timer)
@@ -555,6 +556,7 @@ def main():
     # Plot final state
     plot_sim(state)
     plt.savefig(os.path.join(checkpoint_dir, "final.png"), dpi=240)
+    plt.close()
 
 
 if __name__ == "__main__":
