@@ -510,7 +510,11 @@ def main():
     # construct in fourier space according to Eq (27) of our paper [https://arxiv.org/abs/1801.03507]
     np.random.seed(17)
     # initialize random phases
-    psi = np.exp(1.0j * 2.0 * np.pi * np.random.rand(*k_sq.shape))
+    # (use order to set lowest k modes first)
+    sid = np.argsort(k_sq.flatten(), stable=True)
+    psi = np.zeros((nx**3,), dtype=complex)
+    psi[sid] = np.exp(1.0j * 2.0 * np.pi * np.random.rand(nx**3))
+    psi = psi.reshape(k_sq.shape)
     psi = jnp.array(psi)
     psi *= np.sqrt(np.exp(-k_sq / (2.0 * sigma**2 * m_per_hbar**2)))
     psi = np.fft.ifftn(psi)
